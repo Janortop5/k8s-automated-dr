@@ -1,0 +1,11 @@
+# Loki + Promtail                                                                                                                                                                                                                                                                       at kube kubernetes-admin@kubernetes at 12:29:45 PM
+helm install loki grafana/loki-stack   --namespace monitoring   --set promtail.enabled=true
+NAME: loki
+LAST DEPLOYED: Sat May  3 12:29:58 2025
+NAMESPACE: monitoring
+STATUS: deployed
+REVISION: 1
+NOTES:
+The Loki stack has been deployed to your cluster. Loki can now be added as a datasource in Grafana.
+
+See http://docs.grafana.org/features/datasources/loki/ for more detail. 
