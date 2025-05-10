@@ -1,0 +1,103 @@
+- name: "Ensure br_netfilter module is loaded"
+  modprobe:
+    name: br_netfilter
+    state: present
+
+- name: "Persist br_netfilter on boot"
+  lineinfile:
+    path: /etc/modules-load.d/k8s.conf
+    create: yes
+    line: br_netfilter
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Enable net.bridge sysctls"
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: net.bridge.bridge-nf-call-ip6tables, value: 1 }
+    - { name: net.bridge.bridge-nf-call-iptables,  value: 1 }
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Install APT prerequisites"
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Create keyrings directory"
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Add Kubernetes GPG key"
+  apt_key:
+    url: "https://pkgs.k8s.io/core:/stable:{{ kube_version }}/deb/Release.key"
+    keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Add Kubernetes APT repository"
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:{{ kube_version }}/deb/ /"
+    filename: kubernetes
+    state: present
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Refresh APT cache"
+  apt:
+    update_cache: yes
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Install kubelet, kubeadm, kubectl"
+  apt:
+    name:
+      - "kubelet={{ kube_version }}-00"
+      - "kubeadm={{ kube_version }}-00"
+      - "kubectl={{ kube_version }}-00"
+    state: present
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Hold Kubernetes packages at current version"
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: held
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Disable swap now"
+  command: swapoff -a
+  when:
+    - ansible_distribution == 'Ubuntu'
+    - ansible_swaptotal_mb > 0
+
+- name: "Comment out swap entries in fstab"
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s+.*)$'
+    replace: '#\1'
+  when: ansible_distribution == 'Ubuntu'
+
+- name: "Configure crictl to use containerd socket"
+  shell: crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock
+  args:
+    creates: /etc/crictl.yaml
+
+- name: "Next steps: install Calico or join workers"
+  debug:
+    msg: |
+      After `kubeadm init` on the control plane, run:
+        kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+      On each worker node, join with:
+        sudo kubeadm join <your-master-endpoint> --token <token> \
+          --discovery-token-ca-cert-hash sha256:<hash>

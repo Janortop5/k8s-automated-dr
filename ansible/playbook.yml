@@ -2,15 +2,9 @@
 - hosts: all
   become: true
   vars:
-    container_count: 4
-    default_container_name: hello-world
-    default_container_image: hello-world
-    default_container_command: sleep 1
+    container_check_file: /tmp/container.txt
 
   tasks:
-  - name: Install docker
-    import_tasks: tasks/install_docker.yml
-
   - name: Install containerd
     import_tasks: tasks/containerd_setup.yml
     when: ubuntu_condition
@@ -20,17 +14,18 @@
     import_tasks: tasks/install_monitoring.yml
     tags: monitoring
 
-  roles:
-    - role: k8s_lstm_pipeline
-      vars:
-        docker_registry: "myregistry"
-        docker_image_name: "myimage"
-        docker_image_tag: "latest"
-        pv_size: "10Gi"
-        pv_storage_class: "manual"
-        pv_host_path: "/mnt/data"
-        namespace_name: "metrics-namespace"
-        container_count: "{{ container_count }}"
-        default_container_name: "{{ default_container_name }}"
-        default_container_image: "{{ default_container_image }}"
-        default_container_command: "{{ default_container_command }}"
+  - name: Install Kubernetes components
+    import_tasks: 
+      - tasks/setup_kubetools_pre_task.yml
+      - tasks/setup_kubetools.yml
+    tags: kubetools
+
+  - name: Bootstrap master node
+    import_tasks: tasks/bootstrap_master.yml
+    when: "'master-node' in group_names"
+    tags: kubernetes
+
+  - name: Join worker nodes
+    import_tasks: tasks/join_workers.yml
+    when: "'worker-node' in group_names"
+    tags: kubernetes

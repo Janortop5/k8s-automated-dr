@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: metrics-collector
-  namespace: {{ namespace_name }}
+  namespace: ${NAMESPACE}
 spec:
   replicas: 1
   selector:
@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: collector
-        image: {{ docker_registry }}/{{ docker_image_name }}:{{ docker_image_tag }}
+        image: ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}
         resources:
           limits:
             cpu: "500m"

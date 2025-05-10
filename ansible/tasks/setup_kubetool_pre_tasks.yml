@@ -1,0 +1,19 @@
+- name: "Verify container setup was run"
+  stat:
+    path: "{{ container_check_file }}"
+  register: container_setup
+
+- name: "Abort if setup-container.sh wasn't run"
+  fail:
+    msg: "Please run setup-container.sh before running this playbook"
+  when: not container_setup.stat.exists
+
+- name: "Fetch latest Kubernetes release metadata"
+  uri:
+    url: https://api.github.com/repos/kubernetes/kubernetes/releases/latest
+    return_content: yes
+  register: kube_latest
+
+- name: "Set kube_version fact (strip patch)"
+  set_fact:
+    kube_version: "{{ kube_latest.json.tag_name | regex_replace('^(v[0-9]+\\.[0-9]+)\\..*', '\\1') }}"

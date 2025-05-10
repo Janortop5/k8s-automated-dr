@@ -4,11 +4,11 @@ metadata:
   name: my-pv
 spec:
   capacity:
-    storage: {{ pv_size }}
+    storage: ${PV_SIZE}
   volumeMode: Filesystem
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: {{ pv_storage_class }}
+  storageClassName: ${PV_STORAGE_CLASS}
   hostPath:
-    path: {{ pv_host_path }}
+    path: ${PV_HOST_PATH}

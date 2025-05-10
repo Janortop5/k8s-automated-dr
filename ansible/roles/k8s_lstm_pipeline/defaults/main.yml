@@ -1,5 +1,7 @@
 ---
-# Default variables for the K8s LSTM Data Pipeline role
+# The role was deprecated for this project, opted for jenkins pipeline.
+# Maintaining the role for reference.
+# Default variables for the K8s LSTM Data Pipeline role.
 project_root: "{{ playbook_dir }}/k8s-lstm-project"
 pipeline_dir: "{{ project_root }}/data-pipeline"
 namespace_name: ml-pipeline

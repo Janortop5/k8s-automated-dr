@@ -1,3 +1,15 @@
 *k8s-cluster.pem
 *prometheus/grafana-login-details*
 *prometheus/prometheus-install-output*
+
+.git
+.gitignore
+.dockerignore
+**/.DS_Store
+**/node_modules
+**/venv
+**/__pycache__
+**/README.md
+**/LICENSE
+**/tests
+**/docs
