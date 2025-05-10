@@ -1,0 +1,101 @@
+---
+# Playbook to install Helm and Prometheus on a Kubernetes cluster
+- name: Add Helm signing key
+  ansible.builtin.apt_key:
+    url: https://baltocdn.com/helm/signing.asc
+    state: present
+  register: helm_key_result
+  until: helm_key_result is succeeded
+  retries: 3
+  delay: 5
+
+- name: Install apt-transport-https
+  ansible.builtin.apt:
+    name: apt-transport-https
+    state: present
+    update_cache: yes
+
+- name: Add Helm repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://baltocdn.com/helm/stable/debian/ all main"
+    state: present
+    filename: helm-stable-debian
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install Helm
+  ansible.builtin.apt:
+    name: helm
+    state: present
+  register: helm_install_result
+
+# Verify Helm is installed correctly
+- name: Verify Helm installation
+  ansible.builtin.command: helm version
+  register: helm_version
+  changed_when: false
+  failed_when: helm_version.rc != 0
+
+# Create monitoring namespace
+- name: Create monitoring namespace
+  kubernetes.core.k8s:
+    name: monitoring
+    api_version: v1
+    kind: Namespace
+    state: present
+  register: k8s_namespace
+
+# Add Prometheus Helm repository
+- name: Add Prometheus Helm repository
+  kubernetes.core.helm_repository:
+    name: prometheus-community
+    repo_url: https://prometheus-community.github.io/helm-charts
+  register: helm_repo_add
+
+# Update Helm repositories
+- name: Update Helm repositories
+  ansible.builtin.command: helm repo update
+  changed_when: true
+  register: helm_repo_update
+
+# Install Prometheus using Helm
+- name: Install Prometheus
+  kubernetes.core.helm:
+    name: prometheus
+    chart_ref: prometheus-community/kube-prometheus-stack
+    release_namespace: monitoring
+    wait: true
+  register: prometheus_install
+  
+# Optional: Set up port forwarding as a systemd service
+- name: Create port-forward service for Prometheus
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=Kubernetes port-forward for Prometheus
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=ubuntu
+      ExecStart=/usr/bin/kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 -n monitoring
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/prometheus-port-forward.service
+    mode: 0644
+  
+- name: Enable and start port-forward service
+  ansible.builtin.systemd:
+    name: prometheus-port-forward
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  
+- name: Output Prometheus URL
+  ansible.builtin.debug:
+    msg: "Prometheus should be available at http://localhost:9090 (via port-forwarding)"

@@ -1,0 +1,30 @@
+---
+# Tasks for creating all required files
+
+- name: Copy Python collection script
+  ansible.builtin.copy:
+    src: collect_metrics.py
+    dest: "{{ pipeline_dir }}/collect_metrics.py"
+    mode: '0644'
+
+- name: Copy requirements.txt
+  ansible.builtin.copy:
+    src: requirements.txt
+    dest: "{{ pipeline_dir }}/requirements.txt"
+    mode: '0644'
+
+- name: Create Dockerfile from template
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ pipeline_dir }}/Dockerfile"
+    mode: '0644'
+
+- name: Create Kubernetes manifests from templates
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ pipeline_dir }}/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: 'persistent-volume.yaml.j2', dest: 'persistent-volume.yaml' }
+    - { src: 'persistent-volume-claim.yaml.j2', dest: 'persistent-volume-claim.yaml' }
+    - { src: 'data-collector.yaml.j2', dest: 'data-collector.yaml' }

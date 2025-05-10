@@ -1,0 +1,24 @@
+---
+# Tasks for applying Kubernetes manifests
+
+- name: Create Kubernetes namespace
+  kubernetes.core.k8s:
+    name: "{{ namespace_name }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Apply persistent volume
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ pipeline_dir }}/persistent-volume.yaml"
+
+- name: Apply persistent volume claim
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ pipeline_dir }}/persistent-volume-claim.yaml"
+
+- name: Apply metrics collector deployment
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ pipeline_dir }}/data-collector.yaml"

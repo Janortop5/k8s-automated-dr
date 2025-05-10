@@ -1,0 +1,148 @@
+---
+# This sets up kubernetes container runtime using containerd on Ubuntu.
+# It installs containerd, configures it, and sets up the necessary kernel modules and sysctl parameters.
+# It also installs runc, a container runtime, and configures AppArmor for security.
+# The playbook is designed to be idempotent, meaning it can be run multiple times without changing the system state if it's already configured correctly.
+- name: Gather OS facts
+  ansible.builtin.setup:
+    gather_subset:
+      - 'distribution'
+      - 'hardware'
+
+- name: Set platform variable
+  ansible.builtin.set_fact:
+    platform: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name: jq
+    state: present
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Configure kernel modules for containerd
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/containerd.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: '0644'
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Load kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Configure sysctl parameters for Kubernetes
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-kubernetes-cri.conf
+    reload: yes
+  loop:
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Get latest containerd version
+  ansible.builtin.shell: curl -s https://api.github.com/repos/containerd/containerd/releases/latest | jq -r '.tag_name'
+  register: containerd_tag
+  changed_when: false
+
+- name: Set containerd version
+  ansible.builtin.set_fact:
+    containerd_version: "{{ containerd_tag.stdout | regex_replace('^v', '') }}"
+
+- name: Download containerd
+  ansible.builtin.get_url:
+    url: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-{{ platform }}.tar.gz"
+    dest: "/tmp/containerd-{{ containerd_version }}-linux-{{ platform }}.tar.gz"
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Create containerd directories
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Extract containerd
+  ansible.builtin.unarchive:
+    src: "/tmp/containerd-{{ containerd_version }}-linux-{{ platform }}.tar.gz"
+    dest: /usr/local
+    remote_src: yes
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Configure containerd
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    content: |
+      version = 2
+      [plugins]
+        [plugins."io.containerd.grpc.v1.cri"]
+          [plugins."io.containerd.grpc.v1.cri".containerd]
+            discard_unpacked_layers = true
+            [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+                runtime_type = "io.containerd.runc.v2"
+                [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+                  SystemdCgroup = true
+    mode: '0644'
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Get latest runc version
+  ansible.builtin.shell: curl -s https://api.github.com/repos/opencontainers/runc/releases/latest | jq -r '.tag_name'
+  register: runc_version
+  changed_when: false
+
+- name: Download runc
+  ansible.builtin.get_url:
+    url: "https://github.com/opencontainers/runc/releases/download/{{ runc_version.stdout }}/runc.{{ platform }}"
+    dest: "/tmp/runc.{{ platform }}"
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Install runc
+  ansible.builtin.copy:
+    src: "/tmp/runc.{{ platform }}"
+    dest: /usr/local/sbin/runc
+    mode: '0755'
+    remote_src: yes
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Download containerd service file
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+    dest: /usr/lib/systemd/system/containerd.service
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Enable and start containerd
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  when: ansible_distribution == 'Ubuntu'
+
+- name: Create AppArmor symlink
+  ansible.builtin.file:
+    src: /etc/apparmor.d/runc
+    dest: /etc/apparmor.d/disable/runc
+    state: link
+  ignore_errors: true
+
+- name: Reload AppArmor configuration
+  ansible.builtin.command: apparmor_parser -R /etc/apparmor.d/runc
+  changed_when: true
+  ignore_errors: true
+
+- name: Create marker file
+  ansible.builtin.file:
+    path: /tmp/container.txt
+    state: touch
+    mode: '0644'
