@@ -1,6 +1,0 @@
-[master-node]
-3.214.109.198 ansible_user=ubuntu ansible_ssh_private_key_file=*k8s-cluster.pem
-
-[worker-node]
-13.219.135.17 ansible_user=ubuntu ansible_ssh_private_key_file=*k8s-cluster.pem
-54.86.31.243 ansible_user=ubuntu ansible_ssh_private_key_file=*k8s-cluster.pem
