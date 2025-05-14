@@ -1,7 +1,11 @@
 ---
 - hosts: all
   become: true
+  gather_facts: true
   vars:
+    ubuntu_condition: "{{ ansible_distribution == 'Ubuntu' }}"
+    platform: "amd64"
+    containerd_version: "2.1.0"
     container_check_file: /tmp/container.txt
 
   tasks:
@@ -10,14 +14,12 @@
     when: ubuntu_condition
     tags: containerd
 
-  - name: Install monitoring tools
-    import_tasks: tasks/install_monitoring.yml
-    tags: monitoring
+  - name: Kubernetes components prerequisites check
+    import_tasks: tasks/setup_kubetools_pre_tasks.yml
+    tags: kubetools
 
   - name: Install Kubernetes components
-    import_tasks: 
-      - tasks/setup_kubetools_pre_task.yml
-      - tasks/setup_kubetools.yml
+    import_tasks: tasks/setup_kubetools.yml
     tags: kubetools
 
   - name: Bootstrap master node
@@ -29,3 +31,7 @@
     import_tasks: tasks/join_workers.yml
     when: "'worker-node' in group_names"
     tags: kubernetes
+
+  - name: Install monitoring tools
+    import_tasks: tasks/install_monitoring_helm.yml
+    tags: monitoring

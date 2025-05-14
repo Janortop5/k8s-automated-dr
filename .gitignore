@@ -14,3 +14,15 @@
 **/tests
 **/docs
 **/hosts
+# Terraform directories
+**/.terraform/
+
+# State files
+*.tfstate
+*.tfstate.*
+
+# Sensitive variable files
+*.tfvars
+
+# Terraform plan files
+*.terraform.plan

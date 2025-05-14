@@ -5,13 +5,12 @@
 # The playbook is designed to be idempotent, meaning it can be run multiple times without changing the system state if it's already configured correctly.
 - name: Gather OS facts
   ansible.builtin.setup:
-    gather_subset:
-      - 'distribution'
-      - 'hardware'
 
-- name: Set platform variable
-  ansible.builtin.set_fact:
-    platform: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+- name: Debug ansible_distribution
+  debug:
+    var: ansible_distribution
+
+
 
 - name: Install prerequisites
   ansible.builtin.apt:
@@ -50,14 +49,15 @@
     - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
   when: ansible_distribution == 'Ubuntu'
 
-- name: Get latest containerd version
-  ansible.builtin.shell: curl -s https://api.github.com/repos/containerd/containerd/releases/latest | jq -r '.tag_name'
-  register: containerd_tag
-  changed_when: false
+- name: Fetch latest containerd release info
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/containerd/containerd/releases/latest
+    return_content: yes
+  register: containerd_release
 
-- name: Set containerd version
+- name: Set containerd version (strip leading “v”)
   ansible.builtin.set_fact:
-    containerd_version: "{{ containerd_tag.stdout | regex_replace('^v', '') }}"
+    containerd_version: "{{ containerd_release.json.tag_name | regex_replace('^v','') }}"
 
 - name: Download containerd
   ansible.builtin.get_url:
@@ -96,14 +96,20 @@
     mode: '0644'
   when: ansible_distribution == 'Ubuntu'
 
-- name: Get latest runc version
-  ansible.builtin.shell: curl -s https://api.github.com/repos/opencontainers/runc/releases/latest | jq -r '.tag_name'
-  register: runc_version
-  changed_when: false
+- name: Fetch latest runc release info
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/opencontainers/runc/releases/latest
+    return_content: yes
+  register: runc_release
+
+- name: Set runc version
+  ansible.builtin.set_fact:
+    runc_version: "{{ runc_release.json.tag_name }}"
+  when: ansible_distribution == 'Ubuntu'
 
 - name: Download runc
   ansible.builtin.get_url:
-    url: "https://github.com/opencontainers/runc/releases/download/{{ runc_version.stdout }}/runc.{{ platform }}"
+    url: "https://github.com/opencontainers/runc/releases/download/{{ runc_version }}/runc.{{ platform }}"
     dest: "/tmp/runc.{{ platform }}"
   when: ansible_distribution == 'Ubuntu'
 
