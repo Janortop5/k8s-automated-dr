@@ -3,7 +3,7 @@ resource "aws_lb" "alb" {
   internal           = false
   load_balancer_type = var.alb.load_balancer_type
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public_subnets[var.public_subnets.mini-project-public-1.key].id, aws_subnet.public_subnets[var.public_subnets.mini-project-public-2.key].id]
+  subnets            = [aws_subnet.public_subnets[var.public_subnets.k8s-project-public-1.key].id, aws_subnet.public_subnets[var.public_subnets.k8s-project-public-2.key].id]
 
   enable_deletion_protection = false
 
@@ -33,7 +33,7 @@ resource "aws_lb_target_group_attachment" "alb_tg_attachment_1" {
 resource "aws_lb_target_group_attachment" "alb_tg-attachment_2" {
   for_each         = var.ec2_instance_az2
   target_group_arn = aws_lb_target_group.alb_target_group.arn
-  target_id        = aws_instance.ec2_instance-3[each.key].id
+  target_id        = aws_instance.ec2_instance-3-4[each.key].id
   port             = var.alb_target_group.port
 }
 

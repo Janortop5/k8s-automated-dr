@@ -6,10 +6,22 @@ variable "remote_exec" {
   }
 }
 
-variable "host_inventory" {
-  type = map(any)
-  default = {
-    filename = "../../ansible/hosts"
-  }
+variable "master_ip" {
+  type = string
 }
+
+variable "worker_ips" {
+  type = map(string)
+}
+
+variable "jenkins_ip" {
+  type = string
+}
+
+variable "host_inventory" {
+  type = object({
+    filename = string
+  })
+}
+
 

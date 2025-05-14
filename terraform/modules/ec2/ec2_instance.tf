@@ -13,7 +13,6 @@ resource "aws_instance" "ec2_instance-1-2" {
 }
 resource "aws_eip" "az1" {
   for_each = aws_instance.ec2_instance-1-2
-  domain   = "vpc"
   
   tags = {
     Name = "eip-${each.key}"
@@ -42,7 +41,6 @@ resource "aws_instance" "ec2_instance-3-4" {
 
 resource "aws_eip" "az2" {
   for_each = aws_instance.ec2_instance-3-4
-  domain   = "vpc"
   
   tags = {
     Name = "eip-${each.key}"
