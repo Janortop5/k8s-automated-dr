@@ -38,15 +38,6 @@
   changed_when: false
   failed_when: helm_version.rc != 0
 
-# Create monitoring namespace
-- name: Create monitoring namespace
-  kubernetes.core.k8s:
-    name: monitoring
-    api_version: v1
-    kind: Namespace
-    state: present
-  register: k8s_namespace
-
 # Add Prometheus Helm repository
 - name: Add Prometheus Helm repository
   kubernetes.core.helm_repository:
@@ -59,43 +50,4 @@
   ansible.builtin.command: helm repo update
   changed_when: true
   register: helm_repo_update
-
-# Install Prometheus using Helm
-- name: Install Prometheus
-  kubernetes.core.helm:
-    name: prometheus
-    chart_ref: prometheus-community/kube-prometheus-stack
-    release_namespace: monitoring
-    wait: true
-  register: prometheus_install
-  
-# Optional: Set up port forwarding as a systemd service
-- name: Create port-forward service for Prometheus
-  ansible.builtin.copy:
-    content: |
-      [Unit]
-      Description=Kubernetes port-forward for Prometheus
-      After=network.target
-
-      [Service]
-      Type=simple
-      User=ubuntu
-      ExecStart=/usr/bin/kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 -n monitoring
-      Restart=on-failure
-      RestartSec=5
-
-      [Install]
-      WantedBy=multi-user.target
-    dest: /etc/systemd/system/prometheus-port-forward.service
-    mode: 0644
-  
-- name: Enable and start port-forward service
-  ansible.builtin.systemd:
-    name: prometheus-port-forward
-    enabled: yes
-    state: started
-    daemon_reload: yes
-  
-- name: Output Prometheus URL
-  ansible.builtin.debug:
-    msg: "Prometheus should be available at http://localhost:9090 (via port-forwarding)"
+  until: helm_repo_update is succeeded

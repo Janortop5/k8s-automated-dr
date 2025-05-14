@@ -1,0 +1,25 @@
+- name: Ensure pip3 is present
+  apt:
+    name: "{{ python_pkg }}"
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install required packages
+  apt:
+    name: 
+      - python3-venv
+      - python3-full
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Create virtual environment
+  command: python3 -m venv /opt/ansible_venv
+  args:
+    creates: /opt/ansible_venv
+  when: ansible_os_family == 'Debian'
+
+- name: Install Kubernetes client in virtual environment
+  pip:
+    name: kubernetes
+    executable: /opt/ansible_venv/bin/pip
+  when: ansible_os_family == 'Debian'
