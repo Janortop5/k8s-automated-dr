@@ -2,7 +2,16 @@ variable "remote_exec" {
   type = map(any)
   default = {
     ssh_user         = "ubuntu"
-    private_key_path = "../../ansible/k8s-cluster.pem"
+    private_key_path = "../k8s-cluster.pem"  # file() used to read the private key file, it is relative to root module
+  }
+}
+
+variable "local_exec" {
+  type = map(any)
+  default = {
+    host_inventory = { filename = "../ansible/hosts" },
+    ansible_config = { filename = "../ansible/ansible.cfg" },
+    ansible_playbook = { filename = "../ansible/playbook.yml" },
   }
 }
 

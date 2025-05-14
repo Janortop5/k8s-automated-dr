@@ -1,5 +1,5 @@
 ---
-- hosts: all
+- hosts: master-node:worker-node:!jenkins-server
   become: true
   gather_facts: true
   vars:

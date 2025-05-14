@@ -123,7 +123,7 @@ variable "ec2_instance_az2" {
 
 variable "ec2_instance_key" {
   type    = string
-  default = "k8s-cluster.pem"
+  default = "k8s-cluster"
 }
 
 variable "alb" {
@@ -143,25 +143,26 @@ variable "alb_target_group" {
   }
 }
 
-## uncomment this if going with HTTP only
-#variable "alb_listener_1" {
-#  type = map(any)
-#  default = {
-#    port        = "80"
-#    protocol    = "HTTP"
-#    action_type = "forward"
-#  }
-#}
-
+# uncomment this if going with HTTP only
 variable "alb_listener_1" {
-  type = map(any)
-  default = {
-    port        = "80"
-    protocol    = "HTTP"
-    action_type = "redirect"
-    status_code = "HTTP_301"
-  }
+ type = map(any)
+ default = {
+   port        = "80"
+   protocol    = "HTTP"
+   action_type = "forward"
+ }
 }
+
+## uncomment this if going with HTTPS
+# variable "alb_listener_1" {
+#   type = map(any)
+#   default = {
+#     port        = "80"
+#     protocol    = "HTTP"
+#     action_type = "redirect"
+#     status_code = "HTTP_301"
+#   }
+# }
 
 variable "alb_listener_2" {
   type = map(any)

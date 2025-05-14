@@ -1,26 +1,41 @@
 resource "local_file" "host_inventory" {
   filename = var.host_inventory.filename
-  content  = <<EOF
+
+  content = <<-EOF
 [master-node]
 ${var.master_ip}
 
 [worker-node]
-${join("\n", values(var.worker_ips))}
+%{ for ip in values(var.worker_ips) ~}
+${ip}
+%{ endfor ~}
 
 [jenkins-server]
 ${var.jenkins_ip}
-EOF
+  EOF
+
+  # ensure inventory isn’t written until the IPs exist
+  depends_on = [
+    null_resource.master-node,
+    null_resource.worker-node,
+    null_resource.jenkins-server,
+  ]
 }
 
 # just one host, so no for_each needed
 resource "null_resource" "master-node" {
   provisioner "remote-exec" {
-    inline = ["echo 'SSH is ready'"]
+    inline = [
+      "echo 'SSH is ready'",
+      "which python >/dev/null 2>&1 || sudo apt-get update -y",
+      "sudo apt-get install -y python3 python3-apt",
+      "sudo ln -sf /usr/bin/python3 /usr/bin/python"
+    ]
 
     connection {
       type        = "ssh"
       user        = var.remote_exec.ssh_user
-      private_key = file(var.remote_exec.private_key_path)
+      private_key = file(var.remote_exec.private_key_path)  # it is relative to root module
       host        = var.master_ip
     }
   }
@@ -34,7 +49,7 @@ resource "null_resource" "worker-node" {
     connection {
       type        = "ssh"
       user        = var.remote_exec.ssh_user
-      private_key = file(var.remote_exec.private_key_path)
+      private_key = file(var.remote_exec.private_key_path)  # it is relative to root module
       host        = each.value
     }
   }
@@ -47,18 +62,23 @@ resource "null_resource" "jenkins-server" {
     connection {
       type        = "ssh"
       user        = var.remote_exec.ssh_user
-      private_key = file(var.remote_exec.private_key_path)
+      private_key = file(var.remote_exec.private_key_path)  # it is relative to root module
       host        = var.jenkins_ip
     }
   }
 }
 
 resource "null_resource" "ansible" {
+  # this map must change each plan → Terraform will destroy & recreate this resource
+  triggers = {
+    always_run = timestamp()
+  }
 
   provisioner "local-exec" {
     command = <<-EOT
-              export ANSIBLE_CONFIG=./ansible/ansible.cfg
-              ansible-playbook ./ansible/playbook.yml
+              export ANSIBLE_CONFIG=${var.local_exec.ansible_config.filename}
+              ansible-playbook -i ${var.local_exec.host_inventory.filename} \
+              ${var.local_exec.ansible_playbook.filename} -vvv
     EOT
   }
 }
