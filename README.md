@@ -1,6 +1,27 @@
 # k8s-automated-dr
 *Fun project to develop, learn and build.
 
+## Run Terraform
+First, configure aws cli in control environment.
+```
+aws configure
+```
+
+Run Terraform plan, to see resources to be created, and store output in `.terraform.plan`
+
+```
+terraform plan -out .terraform.plan
+```
+
+Apply Terraform
+
+```
+terraform apply ".terraform.plan"
+```
+A successful Terraform run here, creates ec2 resources and kubeAdm resources. Together, the result is a KubeAdm Cluster on AWS. 
+
+> The `ec2` module creates necessary resources on AWS. The `kubeadm` module runs the ansible playbook placed in this repository, the ansible playbook automates provisioning of KubeAdm kubernetes cluster.
+
 ## K8S LSTM Pipeline CI/CD Setup
 
 This repository contains a Jenkins pipeline for building and deploying an LSTM data pipeline on Kubernetes.

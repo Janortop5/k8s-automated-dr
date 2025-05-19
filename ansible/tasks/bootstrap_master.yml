@@ -1,7 +1,7 @@
 - name: Initialize Kubernetes control plane
   command: >
     kubeadm init
-    --pod-network-cidr={{ pod_network_cidr }}
+    --apiserver-advertise-address={{ master_public_ip }}
   register: kubeadm_init
   args:
     creates: /etc/kubernetes/manifests

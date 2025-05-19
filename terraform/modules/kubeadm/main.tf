@@ -22,6 +22,14 @@ ${var.jenkins_ip}
   ]
 }
 
+resource "local_file" "master-node-vars" {
+  filename = "${var.local_exec.ansible_vars.filename}"
+
+  content = <<-EOF
+  master_public_ip: "${var.master_ip}"
+  EOF
+}
+
 # just one host, so no for_each needed
 resource "null_resource" "master-node" {
   provisioner "remote-exec" {
