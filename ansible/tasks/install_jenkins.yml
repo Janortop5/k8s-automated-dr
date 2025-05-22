@@ -1,0 +1,55 @@
+---
+- name: Update APT cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+
+- name: Install fontconfig and OpenJDK JRE
+  apt:
+    name:
+      - fontconfig
+      - "{{ openjdk_pkg_name }}"
+    state: present
+
+- name: Verify Java version
+  command: java -version
+  register: java_version
+  changed_when: false
+
+- name: Show Java version output
+  debug:
+    msg: "{{ java_version.stderr_lines }}"
+
+- name: Ensure Jenkins keyring directory exists
+  file:
+    path: "{{ jenkins_key_dest | dirname }}"
+    state: directory
+    mode: '0755'
+
+- name: Download Jenkins APT signing key
+  get_url:
+    url: "{{ jenkins_key_url }}"
+    dest: "{{ jenkins_key_dest }}"
+    mode: '0644'
+
+- name: Add Jenkins APT repository
+  apt_repository:
+    repo: "deb [signed-by={{ jenkins_key_dest }}] {{ jenkins_repo_url }} {{ jenkins_repo_components }}"
+    state: present
+
+- name: Update APT cache after adding Jenkins repo
+  apt:
+    update_cache: yes
+
+- name: Install Jenkins
+  apt:
+    name: "{{ jenkins_pkg_name }}"
+    state: present

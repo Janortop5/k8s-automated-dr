@@ -2,8 +2,8 @@ module "ec2" {
   source = "./modules/ec2"
 }
 
-module "kubeadm" {
-  source = "./modules/kubeadm"
+module "ansible_setup" {
+  source = "./modules/ansible_setup"
   host_inventory = {
     filename = "../ansible/hosts"
   }
