@@ -1,0 +1,40 @@
+---
+- hosts: master-node:worker-node:!jenkins-server
+  become: true
+  gather_facts: true
+  vars:
+    ubuntu_condition: "{{ ansible_distribution == 'Ubuntu' }}"
+    platform: "amd64"
+    containerd_version: "2.1.0"
+    container_check_file: /tmp/container.txt
+  vars_files:
+    - host_vars/master-node.yml
+
+  tasks:
+  - name: Install containerd
+    import_tasks: tasks/containerd_setup.yml
+    when: ubuntu_condition
+    tags: containerd
+
+  - name: Kubernetes components prerequisites check
+    import_tasks: tasks/setup_kubetools_pre_tasks.yml
+    tags: kubetools
+
+  - name: Install Kubernetes components
+    import_tasks: tasks/setup_kubetools.yml
+    tags: kubetools
+
+  - name: Bootstrap master node
+    import_tasks: tasks/bootstrap_master.yml
+    when: "'master-node' in group_names"
+    tags: kubernetes
+
+  - name: Join worker nodes
+    import_tasks: tasks/join_workers.yml
+    when: "'worker-node' in group_names"
+    tags: kubernetes
+
+  - name: Install helm
+    import_tasks: tasks/install_helm.yml
+    tags: kubernetes
+    when: "'master-node' in group_names"

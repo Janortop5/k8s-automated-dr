@@ -27,7 +27,7 @@ output "ansible_playbook_command" {
 ANSIBLE_CONFIG=${var.local_exec.ansible_config.filename} \
 ansible-playbook \
   -i ${var.local_exec.host_inventory.filename} \
-  ${var.local_exec.ansible_playbook.filename} \
+  ${var.local_exec.ansible_playbook.playbook} \   # Main playbook file, comment out or uncomment playbooks to run as needed in this file
   --private-key ${var.remote_exec.private_key_path} \
   -u ${var.remote_exec.ssh_user} \
   -vvv

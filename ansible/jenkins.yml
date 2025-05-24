@@ -1,0 +1,12 @@
+---
+- hosts: jenkins-server
+  become: true
+  gather_facts: true
+  vars_files:
+    - host_vars/jenkins-ci.yml
+
+  tasks:
+  - name: Install Jenkins
+    import_tasks: tasks/install_jenkins.yml
+    tags: jenkins
+    when: "'jenkins-server' in group_names"
