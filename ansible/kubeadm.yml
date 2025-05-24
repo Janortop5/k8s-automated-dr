@@ -7,6 +7,7 @@
     platform: "amd64"
     containerd_version: "2.1.0"
     container_check_file: /tmp/container.txt
+    remote_user: "ubuntu"
   vars_files:
     - host_vars/master-node.yml
 

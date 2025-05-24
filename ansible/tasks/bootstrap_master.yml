@@ -85,3 +85,30 @@
     kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
   environment:
     KUBECONFIG: "{{ ansible_env.HOME }}/.kube/config"
+
+- name: Slurp the admin kubeconfig from the master
+  when: "'master-node' in group_names"
+  ansible.builtin.slurp:
+    src: /etc/kubernetes/admin.conf
+  register: admin_conf_slurp
+  run_once: true
+
+- name: Ensure .kube dir in non-root user home
+  ansible.builtin.file:
+    path: "/home/{{ remote_user }}/.kube"
+    state: directory
+    mode: '0755'
+    owner: "{{ remote_user }}"
+    group: "{{ remote_user }}"
+  become: true
+
+- name: Deploy admin kubeconfig into non-root user ~/.kube/config
+  ansible.builtin.copy:
+    content: "{{ hostvars[ groups['master-node'][0] ].admin_conf_slurp.content | b64decode }}"
+    dest: "/home/{{ remote_user }}/.kube/config"
+    mode: '0644'
+    owner: "{{ remote_user }}"
+    group: "{{ remote_user }}"
+  become: true
+  when: admin_conf_slurp is defined
+  no_log: true
