@@ -45,9 +45,59 @@
     repo_url: https://prometheus-community.github.io/helm-charts
   register: helm_repo_add
 
+- name: Add Grafana Helm repository
+  kubernetes.core.helm_repository:
+    name: grafana
+    repo_url: https://grafana.github.io/helm-charts
+  register: helm_repo_add
+
+
 # Update Helm repositories
 - name: Update Helm repositories
   ansible.builtin.command: helm repo update
   changed_when: true
   register: helm_repo_update
   until: helm_repo_update is succeeded
+
+- name: Install Prometheus using Helm
+  kubernetes.core.helm:
+    name: prometheus
+    chart_ref: prometheus-community/kube-prometheus-stack
+    state: present
+    namespace: monitoring
+    create_namespace: true
+    values:
+      server:
+        persistentVolume:
+          storageClass: "standard"
+          size: "10Gi"
+          
+- name: Install Grafana using Helm
+  kubernetes.core.helm:
+    name: grafana
+    chart_ref: grafana/grafana
+    state: present
+    namespace: monitoring
+    create_namespace: true
+    values:
+      persistence:
+        enabled: true
+        size: 10Gi
+      admin:
+        password: "admin"
+
+- name: Install Loki + Promtail using Helm
+  kubernetes.core.helm:
+    name: loki
+    chart_ref: grafana/loki-stack
+    state: present
+    namespace: monitoring
+    create_namespace: true
+    values:
+      loki:
+        persistence:
+          enabled: true
+          size: 10Gi
+      promtail:
+        enabled: true
+  register: loki_install

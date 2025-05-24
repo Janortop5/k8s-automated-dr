@@ -1,6 +1,8 @@
 # k8s-automated-dr
 *Fun project to develop, learn and build.
 
+NOTE KUBEADM USER IS THE ROOT USER
+
 ## Run Terraform
 First, configure aws cli in control environment.
 ```
