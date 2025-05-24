@@ -53,8 +53,44 @@ variable "ec2_instance_sg" {
 }
 
 variable "ec2_instance_inbound_ports" {
-  type    = list(number)
-  default = [80, 443]
+  type = list(object({
+    from_port = number
+    to_port   = number
+    protocol  = string
+    description = string
+  }))
+  default = [
+    {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      description = "HTTP"
+    },
+    {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      description = "HTTPS"
+    },
+    {
+      from_port   = 6443
+      to_port     = 6443
+      protocol    = "tcp"
+      description = "Kubernetes API"
+    },
+    {
+      from_port   = 3000
+      to_port     = 10000
+      protocol    = "tcp"
+      description = "Application ports"
+    },
+    {
+      from_port   = 30000
+      to_port     = 32767
+      protocol    = "tcp"
+      description = "NodePort services"
+    }
+  ]
 }
 
 variable "ec2_instance_ssh_port" {
