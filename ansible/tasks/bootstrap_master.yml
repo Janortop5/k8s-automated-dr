@@ -1,18 +1,46 @@
+---
+- name: Check if Kubernetes is already initialized
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_admin_conf
+
+- name: Stop kubelet so it frees up ports
+  become: true
+  ansible.builtin.systemd:
+    name: kubelet
+    state: stopped
+  when: kubeadm_admin_conf.stat.exists
+
+- name: Kill any stray kubeadm processes
+  become: true
+  ansible.builtin.shell: |
+    pkill kubeadm || true
+  args:
+    warn: false
+  when: kubeadm_admin_conf.stat.exists
+
 - name: Reset any partial kubeadm state
   become: true
-  shell: |
+  ansible.builtin.shell: |
     kubeadm reset -f
-    rm -rf /etc/kubernetes/manifests /etc/kubernetes/pki /etc/kubernetes/admin.conf
+    rm -rf /etc/kubernetes/manifests \
+           /etc/kubernetes/pki \
+           /etc/kubernetes/admin.conf \
+           /var/lib/etcd
+    crictl --runtime-endpoint unix:///run/containerd/containerd.sock rm --force $(crictl ps -aq) || true
   args:
     warn: false
   ignore_errors: true
+  when: kubeadm_admin_conf.stat.exists
 
-- name: Initialize Kubernetes control plane
-  command: >
+- name: Initialize Kubernetes control plane (no taint)
+  become: true
+  ansible.builtin.command: >
     kubeadm init
       --apiserver-advertise-address={{ ansible_default_ipv4.address }}
       --apiserver-cert-extra-sans={{ master_public_ip }}
       --skip-phases=mark-control-plane
+  when: not kubeadm_admin_conf.stat.exists
   register: kubeadm_init
 
 - name: Generate worker join command
@@ -44,6 +72,7 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
+    remote_src: true
 
 - name: Install Calico network plugin
   command: >
