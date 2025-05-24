@@ -18,11 +18,16 @@ Apply Terraform
 ```
 terraform apply ".terraform.plan"
 ```
-A successful Terraform run creates `ec2` resources and  `kubeAdm`'s  ansible playbook resources. Together, the result is a self-managed Kubernetes Cluster on AWS. 
+A successful Terraform run creates `ec2` resources for `kubeadm` and runs the `ansible` playbook. Together, the result is a self-managed `Kubernetes` cluster on `AWS`. 
 
-> The `ec2` module creates necessary resources on AWS for `KubeAdm`. The `ansible_setup` module creates files needed by the ansible playbook in this repository, located in `ansible` to automate provisioning of KubeAdm kubernetes cluster and generates two output, `check_ssh_script` to verify newly provisioned servers are ready for ssh connection, and `ansible_playbook_command`, run the playbook using this command.
+> The `ec2` terraform module creates necessary resources on AWS for `KubeAdm`. The `ansible_setup` module creates files needed for the ansible playbook present in this repository (located in `/ansible`). The `ansible_run` terraform module creates a `kubeadm` kubernetes cluster and runs any other playbook present and specified.
 
-### Using the `check_ssh_script`
+> To manually run the ansible playbook. Comment out the `ansible_run` module in `/terraform/main.tf.` The `ansible_setup` module generates two output, `check_ssh_script` to verify newly provisioned servers are ready for ssh connection, and `ansible_playbook_command` that gives you the command to manually run the playbooks. But before that, uncomment the playbooks to be ran in `ansible/playbook.yml`.
+
+### Run Ansible Manually
+To run the ansible playbook, first, check if instances are ready for ssh connection, second, grab the ansible command generated in the terraform output, and paste in terminal and run.
+
+#### Use the `check_ssh_script`
 There are two options:
 
 - **(Option 1)**. Either paste the `shell` script from the terraform `output` directly in the `terminal` and perform the `ssh` test.
@@ -83,10 +88,7 @@ Run and check ssh connection status:
    ./check_ssh_script.sh
    ```
 
-
-### Run Ansible
-To run the ansible playbook, grab the ansible command generated in the terraform output, and paste in terminal.
-
+#### Finally, run ansible
 Example `terraform` output:
 ```
 

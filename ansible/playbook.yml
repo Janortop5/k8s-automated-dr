@@ -1,2 +1,2 @@
-# - import_playbook: kubeadm.yml
-# - import_playbook: jenkins.yml
+- import_playbook: kubeadm.yml
+- import_playbook: jenkins.yml
