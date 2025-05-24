@@ -40,6 +40,11 @@
     when: "'worker-node' in group_names"
     tags: kubernetes
 
+  - name: Install extra tools on master node
+    import_tasks: tasks/install_extra_k8s_settings.yml
+    when: "'master-node' in group_names"
+    tags: kubetools
+
   - name: Install helm
     import_tasks: tasks/install_helm.yml
     tags: kubernetes

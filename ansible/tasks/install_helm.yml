@@ -69,22 +69,16 @@
     values:
       server:
         persistentVolume:
-          storageClass: "standard"
-          size: "10Gi"
-          
-- name: Install Grafana using Helm
-  kubernetes.core.helm:
-    name: grafana
-    chart_ref: grafana/grafana
-    state: present
-    namespace: monitoring
-    create_namespace: true
-    values:
-      persistence:
-        enabled: true
-        size: 10Gi
-      admin:
-        password: "admin"
+          storageClass: "local-path"
+      kubeEtcd:
+        service:
+          enabled: true
+          port: 2381
+          targetPort: 2381
+        serviceMonitor:
+          enabled: true
+          namespace: kube-system
+          interval: 30s
 
 - name: Install Loki + Promtail using Helm
   kubernetes.core.helm:
@@ -97,7 +91,9 @@
       loki:
         persistence:
           enabled: true
+          storageClassName: "local-path"
           size: 10Gi
       promtail:
         enabled: true
+      
   register: loki_install

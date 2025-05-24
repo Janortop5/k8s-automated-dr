@@ -77,6 +77,30 @@ variable "ec2_instance_k8s_inbound_ports" {
       to_port     = 32767
       protocol    = "tcp"
       description = "NodePort services"
+    },
+    {
+      from_port   = 179
+      to_port     = 179
+      protocol    = "tcp"
+      description = "Allow calico bgp"
+    },
+    {
+      from_port   = 10250
+      to_port     = 10250
+      protocol    = "tcp"
+      description = "Kubelet API"
+    },
+    {
+      from_port   = 10255
+      to_port     = 10255
+      protocol    = "tcp"
+      description = "Read-only Kubelet API"
+    },
+    {
+      from_port   = 9090
+      to_port     = 9090
+      protocol    = "tcp"
+      description = "prometheus metrics"
     }
   ]
 }
