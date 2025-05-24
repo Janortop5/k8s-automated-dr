@@ -52,7 +52,7 @@ variable "ec2_instance_sg" {
   }
 }
 
-variable "ec2_instance_inbound_ports" {
+variable "ec2_instance_k8s_inbound_ports" {
   type = list(object({
     from_port = number
     to_port   = number
@@ -60,18 +60,6 @@ variable "ec2_instance_inbound_ports" {
     description = string
   }))
   default = [
-    {
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      description = "HTTP"
-    },
-    {
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      description = "HTTPS"
-    },
     {
       from_port   = 6443
       to_port     = 6443
@@ -93,9 +81,33 @@ variable "ec2_instance_inbound_ports" {
   ]
 }
 
-variable "ec2_instance_ssh_port" {
-  type    = number
-  default = 22
+variable "ec2_instance_inbound_ports" {
+  type = list(object({
+    from_port   = number
+    to_port     = number
+    protocol    = string
+    description = string
+  }))
+  default = [
+    {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      description = "SSH access"
+    },
+    {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      description = "HTTP access"
+    },
+    {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      description = "HTTPS access"
+    }
+  ]
 }
 
 variable "alb_sg" {
@@ -106,7 +118,11 @@ variable "alb_sg" {
   }
 }
 
-variable "ec2_instance_sg_ssh_cidr_block" {
+variable "ec2_instance_sg_cidr_block" {
+  default = ["0.0.0.0/0"]
+}
+
+variable "ec2_instance_sg_k8s_cidr_block" {
   default = ["0.0.0.0/0"]
 }
 

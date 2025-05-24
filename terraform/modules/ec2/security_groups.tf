@@ -4,22 +4,26 @@ resource "aws_security_group" "ec2_instance_sg" {
   vpc_id      = aws_vpc.vpc.id
 
   dynamic "ingress" {
-    for_each = var.ec2_instance_inbound_ports
+    for_each = var.ec2_instance_k8s_inbound_ports
     content {
       from_port       = ingress.value.from_port
       to_port         = ingress.value.to_port
       protocol        = ingress.value.protocol
-      security_groups = [aws_security_group.alb_sg.id]
       description     = ingress.value.description
+      cidr_blocks     = var.ec2_instance_sg_k8s_cidr_block
     }
   }
   
-  ingress {
-    description = "inbound traffic for ssh"
-    from_port   = var.ec2_instance_ssh_port
-    to_port     = var.ec2_instance_ssh_port
-    protocol    = "tcp"
-    cidr_blocks = var.ec2_instance_sg_ssh_cidr_block
+  dynamic "ingress" {
+    for_each = var.ec2_instance_inbound_ports
+    
+    content {
+      from_port       = ingress.value.from_port
+      to_port         = ingress.value.to_port
+      protocol        = ingress.value.protocol
+      description     = ingress.value.description
+      cidr_blocks     = var.ec2_instance_sg_cidr_block
+    }
   }
 
   egress {

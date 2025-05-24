@@ -1,23 +1,26 @@
 ---
-- name: Check if Kubernetes is already initialized
+- name: Check if control plane is initialized
   ansible.builtin.stat:
-    path: /etc/kubernetes/admin.conf
-  register: kubeadm_admin_conf
+    path: /etc/kubernetes/manifests/kube-apiserver.yaml
+  register: cp_manifest
 
 - name: Stop kubelet so it frees up ports
   become: true
   ansible.builtin.systemd:
     name: kubelet
     state: stopped
-  when: kubeadm_admin_conf.stat.exists
+  when: cp_manifest.stat.exists
 
 - name: Kill any stray kubeadm processes
   become: true
-  ansible.builtin.shell: |
-    pkill kubeadm || true
-  args:
-    warn: false
-  when: kubeadm_admin_conf.stat.exists
+  ansible.builtin.shell:
+     cmd: |
+       # make sure kubelet is dead so ports 6443,10250,etc. are free
+       systemctl stop kubelet
+       # kill any half-baked kubeadm runs
+       pkill kubeadm || true
+  ignore_errors: true
+  when: cp_manifest.stat.exists
 
 - name: Reset any partial kubeadm state
   become: true
@@ -28,10 +31,9 @@
            /etc/kubernetes/admin.conf \
            /var/lib/etcd
     crictl --runtime-endpoint unix:///run/containerd/containerd.sock rm --force $(crictl ps -aq) || true
-  args:
-    warn: false
+    rm -rf /var/lib/kubelet/*
   ignore_errors: true
-  when: kubeadm_admin_conf.stat.exists
+  when: cp_manifest.stat.exists
 
 - name: Initialize Kubernetes control plane (no taint)
   become: true
@@ -40,11 +42,15 @@
       --apiserver-advertise-address={{ ansible_default_ipv4.address }}
       --apiserver-cert-extra-sans={{ master_public_ip }}
       --skip-phases=mark-control-plane
-  when: not kubeadm_admin_conf.stat.exists
+  args:
+    creates: /etc/kubernetes/manifests/kube-apiserver.yaml
   register: kubeadm_init
 
 - name: Generate worker join command
-  command: kubeadm token create --print-join-command
+  become: true
+  ansible.builtin.command: kubeadm token create --print-join-command
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   register: kubeadm_join
 
 - name: Save join command for workers

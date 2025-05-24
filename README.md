@@ -184,8 +184,6 @@ The Terraform directory contains infrastructure-as-code for provisioning cloud r
 /terraform
 ├── modules/             # ec2, ansible_setup, ansible_run, open_id <-- this is for jenkins
 │
-├── examples/  
-│
 ├── variables.tf         # Input variables
 ├── outputs.tf           # Output variables
 └── main.tf              # Main Terraform configuration

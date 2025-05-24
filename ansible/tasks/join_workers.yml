@@ -1,6 +1,16 @@
 ---
+- name: Wait for API server to be reachable
+  wait_for:
+    host: "{{ hostvars[groups['master-node'][0]].ansible_default_ipv4.address }}"
+    port: 6443
+    state: started
+    timeout: 300
+
 - name: Join the Kubernetes cluster
-  command: >-
-    {{ join_command }} --ignore-preflight-errors=all
+  become: true
+  command: >
+    {{ hostvars[groups['master-node'][0]].join_command }}
+    --apiserver-advertise-address={{ hostvars[groups['master-node'][0]].ansible_default_ipv4.address }}
+    --ignore-preflight-errors=all
   args:
     creates: /etc/kubernetes/kubelet.conf
