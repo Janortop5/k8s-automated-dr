@@ -163,14 +163,17 @@ The Ansible directory contains configurations for infrastructure management and 
 │   ├── bootstrap_master.yml         
 │   ├── containerd_setup.yml    
 │   ├── install_docker.yml         
-│   ├── install_monitoring_heml.yml    
+│   ├── install_monitoring_heml.yml
 │   ├── join_workers.yml         
-│   ├── setup_kubetool_pre_tasks.yml    
-│   └── setup_kubetools.yml     
+│   ├── setup_kubetool_pre_tasks.yml
+│   ├── setup_kubetools.yml     
+│   └── install_jenkins.yml
 │
-├── playbook.yml              # Playbook for automated kubeadm setup
+├── kubeadm.yml               # Playbook for automated kubeadm setup
+├── jenkins.yml               # Playbook for automated jenkins setup
+├── playbook.yml              # Playbook for automated kubeadm setup and jenkins
 │
-└── training                  # Hosts file
+└── hosts                  # Hosts file automatically created by terraform
 ```
 
 ## Terraform Directory
@@ -179,7 +182,7 @@ The Terraform directory contains infrastructure-as-code for provisioning cloud r
 
 ```
 /terraform
-├── modules/             # Reusable Terraform containerd-setup         # deprecated
+├── modules/             # ec2, ansible_setup, ansible_run, open_id <-- this is for jenkins
 │
 ├── examples/  
 │
@@ -199,29 +202,10 @@ The monitoring setup uses Prometheus, Grafana and Loki for observability:
 ```
 
 # TODO
-### TEST ANSIBLE AND TERRAFORM CONFIGURATION AND CI PIPELINE
-
-## Prerequisites
-
-1. A running Jenkins server with the following plugins installed:
-   - Pipeline
-   - Kubernetes
-   - Credentials
-   - Docker Pipeline
-   - Jenkins Kubernetes plugin
-
-2. Access to a Kubernetes cluster (for Jenkins to deploy to)
-
-3. Docker registry credentials
-
+### SETUP MONITORING ON CLUSTER, JENKINS AND K8S-LSTM PIPELINE
 ## Setup Steps
 
-### 1. Create Jenkins Credentials
-
-Create the following credentials in Jenkins:
-
-- **docker-registry-url**: Secret text containing your Docker registry URL
-- **docker-registry-credentials**: Username with password for your Docker registry login
+### 1. Validate OpenID module in /terraform directory
 
 ### 2. Create the Pipeline Job
 
