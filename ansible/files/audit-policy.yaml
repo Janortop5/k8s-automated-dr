@@ -1,3 +1,4 @@
+---
 apiVersion: audit.k8s.io/v1
 kind: Policy
 # Log only metadata (user, verb, resource, timestamp) for all requests:
@@ -5,8 +6,10 @@ rules:
   - level: Metadata
     resources:
       - group: ""        # core API group
-        resources: ["pods", "secrets", "configmaps", "namespaces"]
-  # If you want full request/response bodies for certain verbs on critical resources:
+        resources: ["pods",
+                    "secrets",
+                    "configmaps", "namespaces"]
+
   - level: RequestResponse
     verbs: ["create", "delete", "update"]
     resources:
