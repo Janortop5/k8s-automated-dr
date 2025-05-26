@@ -15,8 +15,6 @@
     dest: /usr/local/bin/yq
     mode: '0755'
   become: true
-  args:
-    creates: /usr/local/bin/yq
 
 # 1) Make sure our audit log dir & policy file exist
 - name: Create audit log directory
