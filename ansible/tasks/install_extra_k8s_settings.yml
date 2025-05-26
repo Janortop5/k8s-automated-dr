@@ -33,39 +33,6 @@
     mode: '0644'
   become: true
 
-# 2) Clean out any old audit mounts/volumes
-- name: Remove legacy audit‐policy mount if present
-  command: >
-    yq eval -i '
-      with(.spec.containers[] | select(.name == "kube-apiserver"); 
-        .volumeMounts |= map(select(.name != "audit-policy"))
-      )
-    ' /etc/kubernetes/manifests/kube-apiserver.yaml
-  become: true
-
-- name: Remove legacy audit‐logs mount if present
-  command: >
-    yq eval -i '
-      with(.spec.containers[] | select(.name == "kube-apiserver"); 
-        .volumeMounts |= map(select(.name != "audit-logs"))
-      )
-    ' /etc/kubernetes/manifests/kube-apiserver.yaml
-  become: true
-
-- name: Remove legacy audit‐policy volume if present
-  command: >
-    yq eval -i '
-      .spec.volumes |= map(select(.name != "audit-policy"))
-    ' /etc/kubernetes/manifests/kube-apiserver.yaml
-  become: true
-
-- name: Remove legacy audit‐logs volume if present
-  command: >
-    yq eval -i '
-      .spec.volumes |= map(select(.name != "audit-logs"))
-    ' /etc/kubernetes/manifests/kube-apiserver.yaml
-  become: true
-
 # 3) Insert the four blocks in the right place
 - name: Add audit‐policy mount to kube‐apiserver
   command: >
