@@ -1,39 +1,31 @@
 ---
-# 0.0) Remove any old, broken audit blocks so we start from a clean slate
-- name: Remove legacy ANSIBLE AUDIT POLICY block
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "# {mark} ANSIBLE AUDIT POLICY"
-    state: absent
-
-- name: Remove legacy ANSIBLE AUDIT VOLUME MOUNTS block
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "# {mark} ANSIBLE AUDIT VOLUME MOUNTS"
-    state: absent
-
-- name: Remove legacy ANSIBLE AUDIT VOLUMES block
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "# {mark} ANSIBLE AUDIT VOLUMES"
-    state: absent
-
-# 0.1) Ensure yamllint is installed
-- name: Download Mike Farah yq v4 binary
+# 0) Prereqs: make sure yq (Go binary) and yamllint are available
+- name: Ensure yq v4 and yamllint are installed
+  apt:
+    name:
+      - curl        # to fetch yq
+      - yamllint
+    state: present
+    update_cache: yes
   become: true
+
+- name: Download Mike Farah's yq v4 if not present
   get_url:
     url: https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64
     dest: /usr/local/bin/yq
     mode: '0755'
+  become: true
+  args:
+    creates: /usr/local/bin/yq
 
-# 1) Ensure audit log directory exists
+# 1) Make sure our audit log dir & policy file exist
 - name: Create audit log directory
   file:
     path: /var/log/kubernetes/audit
     state: directory
     mode: '0700'
+  become: true
 
-# 2) Copy your audit policy
 - name: Copy audit policy to control-plane
   copy:
     src: audit-policy.yaml
@@ -41,90 +33,87 @@
     owner: root
     group: root
     mode: '0644'
-
-# 3.1) Mount the audit-policy file into kube-apiserver
-- name: Mount audit-policy file in kube-apiserver
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "      # {mark} ANSIBLE AUDIT POLICY MOUNT"
-    insertafter: '^ {4}volumeMounts:$'
-    block: |
-      ​      - name: audit-policy
-      ​        mountPath: /etc/kubernetes/audit-policy.yaml
-      ​        subPath: audit-policy.yaml
-      ​        readOnly: true
-  notify: Restart kubelet
-
-# 3.2) Mount the audit-logs directory into kube-apiserver
-- name: Mount audit-logs directory in kube-apiserver
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "      # {mark} ANSIBLE AUDIT LOG MOUNT"
-    insertafter: '^ {4}volumeMounts:$'
-    block: |
-      ​      - name: audit-logs
-      ​        mountPath: /var/log/kubernetes/audit
-      ​        readOnly: false
-  notify: Restart kubelet
-
-# 3.3) Declare the hostPath volume for the audit-policy file
-- name: Declare audit-policy hostPath volume
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "    # {mark} ANSIBLE AUDIT POLICY VOLUME"
-    insertafter: '^ {2}volumes:$'
-    block: |
-       ​    - name: audit-policy
-       ​      hostPath:
-       ​        path: /etc/kubernetes/audit-policy.yaml
-       ​        type: FileOrCreate
-  notify: Restart kubelet
-
-# 3.4) Declare the hostPath volume for audit-logs
-- name: Declare audit-logs hostPath volume
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "    # {mark} ANSIBLE AUDIT LOG VOLUME"
-    insertafter: '^ {2}volumes:$'
-    block: |
-          - name: audit-logs
-            hostPath:
-              path: /var/log/kubernetes/audit
-              type: DirectoryOrCreate
-  notify: Restart kubelet
-
-# 3.5) Mount the audit directory into the API-server container
-- name: Mount audit directory in kube-apiserver
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "# {mark} ANSIBLE AUDIT LOG MOUNT"
-    insertafter: 'volumeMounts:'
-    block: |
-      - name: audit-logs
-        mountPath: /var/log/kubernetes/audit
-        readOnly: false
-
-# 3.6) Declare the hostPath volume for audit-logs
-- name: Declare audit-logs hostPath volume
-  blockinfile:
-    path: /etc/kubernetes/manifests/kube-apiserver.yaml
-    marker: "# {mark} ANSIBLE AUDIT LOG VOLUME"
-    insertafter: 'volumes:'
-    block: |
-      - name: audit-logs
-        hostPath:
-          path: /var/log/kubernetes/audit
-          type: DirectoryOrCreate
-  notify: Restart kubelet
-
-# 4) Auto-format the manifest so the indentation is normalized
-- name: Auto-format kube-apiserver manifest with yq
   become: true
-  command: yq eval -i '.' /etc/kubernetes/manifests/kube-apiserver.yaml
 
-# 5) lint the resulting manifest before we ever restart kubelet
+# 2) Clean out any old audit mounts/volumes
+- name: Remove legacy audit‐policy mount if present
+  command: >
+    yq eval -i '
+      with(.spec.containers[] | select(.name == "kube-apiserver"); 
+        .volumeMounts |= map(select(.name != "audit-policy"))
+      )
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+
+- name: Remove legacy audit‐logs mount if present
+  command: >
+    yq eval -i '
+      with(.spec.containers[] | select(.name == "kube-apiserver"); 
+        .volumeMounts |= map(select(.name != "audit-logs"))
+      )
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+
+- name: Remove legacy audit‐policy volume if present
+  command: >
+    yq eval -i '
+      .spec.volumes |= map(select(.name != "audit-policy"))
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+
+- name: Remove legacy audit‐logs volume if present
+  command: >
+    yq eval -i '
+      .spec.volumes |= map(select(.name != "audit-logs"))
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+
+# 3) Insert the four blocks in the right place
+- name: Add audit‐policy mount to kube‐apiserver
+  command: >
+    yq eval -i '
+      (.spec.containers[] | select(.name == "kube-apiserver") .volumeMounts) +=
+      [{"name":"audit-policy",
+        "mountPath":"/etc/kubernetes/audit-policy.yaml",
+        "subPath":"audit-policy.yaml",
+        "readOnly":true}]
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+  notify: Restart kubelet
+
+- name: Add audit‐logs mount to kube‐apiserver
+  command: >
+    yq eval -i '
+      (.spec.containers[] | select(.name == "kube-apiserver") .volumeMounts) +=
+      [{"name":"audit-logs",
+        "mountPath":"/var/log/kubernetes/audit",
+        "readOnly":false}]
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+  notify: Restart kubelet
+
+- name: Add audit‐policy volume to kube‐apiserver
+  command: >
+    yq eval -i '
+      .spec.volumes +=
+      [{"name":"audit-policy",
+        "hostPath":{"path":"/etc/kubernetes/audit-policy.yaml","type":"FileOrCreate"}}]
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+  notify: Restart kubelet
+
+- name: Add audit‐logs volume to kube‐apiserver
+  command: >
+    yq eval -i '
+      .spec.volumes +=
+      [{"name":"audit-logs",
+        "hostPath":{"path":"/var/log/kubernetes/audit","type":"DirectoryOrCreate"}}]
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+  notify: Restart kubelet
+
+# 4) Lint the resulting manifest (80-char rule disabled)
 - name: Lint kube-apiserver manifest (ignore line-length)
-  become: true
   command: >
     yamllint
       -d "{extends: default, rules: {line-length: disable}}"
@@ -133,8 +122,9 @@
   register: lint_result
   failed_when: lint_result.rc != 0
   changed_when: false
+  become: true
 
-# 6) If lint passes, restart kubelet so API server picks up the new manifest
+# 5) If lint passed, restart kubelet
 - name: Restart kubelet to apply new kube-apiserver manifest
   service:
     name: kubelet
