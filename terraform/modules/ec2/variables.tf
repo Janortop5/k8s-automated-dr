@@ -95,12 +95,6 @@ variable "ec2_instance_k8s_inbound_ports" {
       to_port     = 10255
       protocol    = "tcp"
       description = "Read-only Kubelet API"
-    },
-    {
-      from_port   = 9090
-      to_port     = 9090
-      protocol    = "tcp"
-      description = "prometheus metrics"
     }
   ]
 }

@@ -44,8 +44,17 @@
     import_tasks: tasks/install_extra_k8s_settings.yml
     when: "'master-node' in group_names"
     tags: kubetools
+    notify:
+      - Restart kubelet
 
   - name: Install helm
     import_tasks: tasks/install_helm.yml
     tags: kubernetes
     when: "'master-node' in group_names"
+
+  handlers:
+    - name: Restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+        daemon_reload: yes
