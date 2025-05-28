@@ -169,11 +169,5 @@
     state: restarted
   become: true
 
-- name: Wait for kube-apiserver to be reachable
-  wait_for:
-    host: 127.0.0.1
-    port: 6443
-    delay: 5
-    timeout: 60
-  become: true
+  
 
