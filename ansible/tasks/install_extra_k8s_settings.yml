@@ -9,7 +9,7 @@
     update_cache: yes
   become: true
 
-- name: Download Mike Farah's yq v4 if not present
+- name: Download Mike Farah’s yq v4 if not present
   get_url:
     url: https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64
     dest: /usr/local/bin/yq
@@ -33,23 +33,96 @@
     mode: '0644'
   become: true
 
-# 3) Insert the four blocks in the right place
-- name: Add audit‐policy mount to kube‐apiserver
+# 2) Ensure the manifest begins with a YAML document start
+- name: Ensure '---' at top of kube-apiserver manifest
+  lineinfile:
+    path: /etc/kubernetes/manifests/kube-apiserver.yaml
+    line: '---'
+    insertafter: BOF
+    state: present
+  become: true
+
+# 3) Clean out *any* existing audit mounts/volumes so we start idempotent
+- name: Remove existing audit-policy mount
   command: >
     yq eval -i '
-      (.spec.containers[] | select(.name == "kube-apiserver") .volumeMounts) +=
+      with(.spec.containers[] | select(.name=="kube-apiserver");
+        .volumeMounts |= map(select(.name!="audit-policy"))
+      )
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  ignore_errors: true
+  become: true
+
+- name: Remove existing audit-logs mount
+  command: >
+    yq eval -i '
+      with(.spec.containers[] | select(.name=="kube-apiserver");
+        .volumeMounts |= map(select(.name!="audit-logs"))
+      )
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  ignore_errors: true
+  become: true
+
+- name: Remove existing audit-policy volume
+  command: >
+    yq eval -i '
+      .spec.volumes |= map(select(.name!="audit-policy"))
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  ignore_errors: true
+  become: true
+
+- name: Remove existing audit-logs volume
+  command: >
+    yq eval -i '
+      .spec.volumes |= map(select(.name!="audit-logs"))
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  ignore_errors: true
+  become: true
+
+- name: Remove any existing audit mounts
+  command: >
+    yq eval -i '
+      with(.spec.containers[] | select(.name=="kube-apiserver");
+        .volumeMounts |= (unique_by(.name))
+      )
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+
+- name: Ensure audit log file exists
+  file:
+    path: /var/log/kubernetes/audit/audit.log
+    state: touch
+    owner: root
+    group: root
+    mode: '0640'
+  become: true
+
+- name: Add --audit-log-path and --audit-policy-file to kube-apiserver args
+  command: >
+    yq eval -i '
+      (.spec.containers[] | select(.name=="kube-apiserver") .command)
+        += ["--audit-log-path=/var/log/kubernetes/audit/audit.log",
+            "--audit-policy-file=/etc/kubernetes/audit-policy.yaml"]
+    ' /etc/kubernetes/manifests/kube-apiserver.yaml
+  become: true
+  notify: Restart kubelet
+
+# 4) Insert the four audit blocks structurally via yq
+- name: Add audit-policy mount to kube-apiserver
+  command: >
+    yq eval -i '
+      (.spec.containers[] | select(.name=="kube-apiserver") .volumeMounts) +=
       [{"name":"audit-policy",
         "mountPath":"/etc/kubernetes/audit-policy.yaml",
-        "subPath":"audit-policy.yaml",
         "readOnly":true}]
     ' /etc/kubernetes/manifests/kube-apiserver.yaml
   become: true
   notify: Restart kubelet
 
-- name: Add audit‐logs mount to kube‐apiserver
+- name: Add audit-logs mount to kube-apiserver
   command: >
     yq eval -i '
-      (.spec.containers[] | select(.name == "kube-apiserver") .volumeMounts) +=
+      (.spec.containers[] | select(.name=="kube-apiserver") .volumeMounts) +=
       [{"name":"audit-logs",
         "mountPath":"/var/log/kubernetes/audit",
         "readOnly":false}]
@@ -57,7 +130,7 @@
   become: true
   notify: Restart kubelet
 
-- name: Add audit‐policy volume to kube‐apiserver
+- name: Add audit-policy volume to kube-apiserver
   command: >
     yq eval -i '
       .spec.volumes +=
@@ -67,7 +140,7 @@
   become: true
   notify: Restart kubelet
 
-- name: Add audit‐logs volume to kube‐apiserver
+- name: Add audit-logs volume to kube-apiserver
   command: >
     yq eval -i '
       .spec.volumes +=
@@ -77,7 +150,7 @@
   become: true
   notify: Restart kubelet
 
-# 4) Lint the resulting manifest (80-char rule disabled)
+# 5) Lint the resulting manifest (80-char rule disabled)
 - name: Lint kube-apiserver manifest (ignore line-length)
   command: >
     yamllint
@@ -89,9 +162,18 @@
   changed_when: false
   become: true
 
-# 5) If lint passed, restart kubelet
+# 6) If lint passed, restart kubelet so API server picks up the new manifest
 - name: Restart kubelet to apply new kube-apiserver manifest
   service:
     name: kubelet
     state: restarted
   become: true
+
+- name: Wait for kube-apiserver to be reachable
+  wait_for:
+    host: 127.0.0.1
+    port: 6443
+    delay: 5
+    timeout: 60
+  become: true
+

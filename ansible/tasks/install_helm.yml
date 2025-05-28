@@ -97,6 +97,7 @@
     namespace: monitoring
     create_namespace: false
     state: present
+    kubeconfig: /etc/kubernetes/admin.conf 
     values:
       loki:
         enabled: false
