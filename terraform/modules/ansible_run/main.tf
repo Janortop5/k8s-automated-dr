@@ -39,6 +39,13 @@ resource "null_resource" "jenkins-server" {
   }
 }
 
+resource "null_resource" "ansibletimer" {
+  # this map must change each plan → Terraform will destroy & recreate this resource
+  triggers = {
+    always_run = timestamp()
+  }
+}
+
 resource "null_resource" "ansible" {
   provisioner "local-exec" {
     command = <<-EOT

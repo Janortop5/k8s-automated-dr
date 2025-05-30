@@ -1,0 +1,5 @@
+---
+- name: Restart Dns controller
+  shell: |
+    kubectl rollout restart deployment coredns -n kube-system
+  ignore_errors: false

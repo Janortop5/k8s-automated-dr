@@ -33,6 +33,15 @@
     mode: '0644'
   become: true
 
+- name: Copy a folder to the server
+  copy:
+    src: collections/
+    dest: /opt/collections/
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
 # 2) Ensure the manifest begins with a YAML document start
 - name: Ensure '---' at top of kube-apiserver manifest
   lineinfile:
@@ -150,6 +159,41 @@
   become: true
   notify: Restart kubelet
 
+- name: Wait for API server to be ready after kubelet restart
+  shell: KUBECONFIG=/home/ubuntu/.kube/config kubectl get nodes
+  register: api_check
+  until: api_check.rc == 0
+  retries: 30
+  delay: 10
+  become: true
+
+- name: Ensure kubernetes-admin has cluster-admin privileges
+  shell: KUBECONFIG=/home/ubuntu/.kube/config kubectl create clusterrolebinding kubernetes-admin-binding --clusterrole=cluster-admin --user=kubernetes-admin
+  ignore_errors: true
+  become: true
+
+- name: Check if ml-pipeline namespace exists
+  shell: KUBECONFIG=/home/ubuntu/.kube/config kubectl get namespace ml-pipeline
+  register: namespace_check
+  failed_when: false
+  become: true
+
+- name: Create ml-pipeline namespace
+  shell: KUBECONFIG=/home/ubuntu/.kube/config kubectl create namespace ml-pipeline
+  when: namespace_check.rc != 0
+  become: true
+
+- name: Find all YAML files in /opt/collections
+  find:
+    paths: /opt/collections
+    patterns: "*.yaml"
+  register: yaml_files
+  become: true
+- name: Apply each YAML file using kubectl
+  shell: kubectl apply -f {{ item.path }}
+  loop: "{{ yaml_files.files }}"
+  become: true
+
 # 5) Lint the resulting manifest (80-char rule disabled)
 - name: Lint kube-apiserver manifest (ignore line-length)
   command: >
@@ -169,5 +213,4 @@
     state: restarted
   become: true
 
-  
 

@@ -7,7 +7,7 @@ pipeline_dir: "{{ project_root }}/data-pipeline"
 namespace_name: ml-pipeline
 docker_image_name: metrics-collector
 docker_image_tag: latest
-docker_registry: your-registry
+docker_registry: freshinit
 prometheus_url: http://localhost:9090
 pv_size: 10Gi
 pv_storage_class: standard

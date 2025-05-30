@@ -1,0 +1,44 @@
+# pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: metrics-exporter-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path 
+  hostPath:
+    path: "/mnt/metrics"  # Ensure this path exists on your node
+  persistentVolumeReclaimPolicy: Retain
+---
+# pv-metadata-collector.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: metadata-collector-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path 
+  hostPath:
+    path: "/mnt/metadata"
+  persistentVolumeReclaimPolicy: Retain
+---
+# pv-data-processor.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: data-processor-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path 
+  hostPath:
+    path: "/mnt/processed-metadata"
+  persistentVolumeReclaimPolicy: Retain

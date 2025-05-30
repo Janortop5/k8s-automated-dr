@@ -51,6 +51,18 @@
     import_tasks: tasks/install_helm.yml
     tags: kubernetes
     when: "'master-node' in group_names"
+    notify:
+      - Restart kubelet
+
+  - name: Setup Pipeline
+    import_tasks: tasks/ml_pipeline.yml
+    tags: kubernetes
+    when: "'master-node' in group_names" 
+
+  - name: Restart coredns
+    import_tasks: tasks/restart_coredns.yml
+    tags: kubernetes
+    when: "'master-node' in group_names"  
 
   handlers:
     - name: Restart kubelet
