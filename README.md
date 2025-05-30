@@ -1,7 +1,5 @@
 # k8s-automated-dr
-*Fun project to develop, learn and build.
-
-NOTE KUBEADM USER IS THE ROOT USER
+A Jenkins-driven pipeline builds a PyTorch LSTM anomaly detector on etcd metrics, deploys it to a kubeadm cluster, and a Kopf operator automatically triggers a safe etcd snapshot+restore when anomaly score > τ, all proved by a chaos test.
 
 ## Run Terraform
 First, configure aws cli in control environment.
