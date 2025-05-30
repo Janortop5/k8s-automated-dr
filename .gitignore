@@ -26,3 +26,5 @@
 
 # Terraform plan files
 *.terraform.plan
+
+*instances_status.sh
