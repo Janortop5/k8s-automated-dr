@@ -53,3 +53,18 @@
   apt:
     name: "{{ jenkins_pkg_name }}"
     state: present
+
+- name: Ensure Jenkins service is started
+  service:
+    name: jenkins
+    state: started
+    enabled: yes
+
+- name: Wait for Jenkins to be up (HTTP 200 on /login)
+  uri:
+    url: "http://localhost:8080/login"
+    status_code: 200
+  register: jenkins_up
+  retries: 12
+  delay: 10
+  until: jenkins_up.status == 200

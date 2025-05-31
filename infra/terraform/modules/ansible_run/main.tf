@@ -1,3 +1,13 @@
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
+  }
+}
+
 # just one host, so no for_each needed
 resource "null_resource" "master-node" {
   provisioner "remote-exec" {

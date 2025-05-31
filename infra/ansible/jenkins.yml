@@ -10,3 +10,19 @@
     import_tasks: tasks/install_jenkins.yml
     tags: jenkins
     when: "'jenkins-server' in group_names"
+
+  - name: Install Jenkins plugins
+    import_tasks: tasks/install_extra_jenkins_settings.yml
+    tags: jenkins
+    when: "'jenkins-server' in group_names"
+
+  handlers:
+    - name: restart jenkins
+      systemd:
+        name: jenkins
+        state: restarted
+
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded

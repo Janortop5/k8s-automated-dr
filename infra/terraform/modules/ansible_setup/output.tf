@@ -27,7 +27,9 @@ output "ansible_playbook_command" {
 ANSIBLE_CONFIG=${var.local_exec.ansible_config.filename} \
 ansible-playbook \
   -i ${var.local_exec.host_inventory.filename} \
-  ${var.local_exec.ansible_playbook.playbook} \   # Main playbook file, comment out or uncomment playbooks to run as needed in this file
+  ${var.local_exec.ansible_playbook.playbook} \   # Main playbook file, runs both kubeadm and jenkins
+  # ${var.local_exec.ansible_playbook.kubeadm} \      # playbook file for kubeadm setup
+  # ${var.local_exec.ansible_playbook.jenkins} \    # playbook file for jenkins setup
   --private-key ${var.remote_exec.private_key_path} \
   -u ${var.remote_exec.ssh_user} \
   -vvv

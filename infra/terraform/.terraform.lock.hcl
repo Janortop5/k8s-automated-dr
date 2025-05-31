@@ -63,3 +63,26 @@ provider "registry.terraform.io/hashicorp/null" {
     "zh:ed0fe2acdb61330b01841fa790be00ec6beaac91d41f311fb8254f74eb6a711f",
   ]
 }
+
+provider "registry.terraform.io/lexfrei/namedotcom" {
+  version     = "1.1.10"
+  constraints = "~> 1.1.6"
+  hashes = [
+    "h1:AiwlYGb3nDlg+0CI+g94Vxs8744Hjs65nov+mxKGKzQ=",
+    "zh:0fa82a384b25a58b65523e0ea4768fa1212b1f5cfc0c9379d31162454fedcc9d",
+    "zh:1ce8e879684d24568b7575c96a7fbf698b8eaf7dc52bc4ae431c3d813a39aa92",
+    "zh:32c6bd790272ab2e8346883c7e16cdb4fcaa87f763035c4728636aafd94ba3b8",
+    "zh:41362deeba9b5dffc5b5618ac4239c8c54b361cb4eef7d6105b85cd60b9010ed",
+    "zh:48f5cadd904b421bcde9c8a478fd555e9c3fc47c043e0b4f6b004087b54944e5",
+    "zh:64b8c0060b0b05ea776ef7bb8586232dcb4ffda845b67a1de3b0943ab6692438",
+    "zh:8bd8ac10465d9609aa3f8cc760e887d058618f861e31ec8d12efb25240e3b372",
+    "zh:8bdfca9e85a67afab61ba4d0c9803fdc8ecab9917836504dd2e526a4489a27af",
+    "zh:afb77b005e9a419ceb62c6c9417dd2e609a50e8ba1bb698b4e37e547dfb828fb",
+    "zh:c2eb7cb7c00f610c0ea8875e41fccd93d6a91b3afd9ed8f6d758368527873778",
+    "zh:c3342c408919638e43ad708a2242a635579abce654090ad43dc5ecfad8d807a3",
+    "zh:c5fc17d0689ace6d883bc9736ad0f010f369a3c0e9b0a6a2ac4437bb2e771bf3",
+    "zh:cade83e903f8247c90fbf962098fbc8405ac35344379da20139dcf409a4df544",
+    "zh:e4fdbfec3331a1de669110ce1cfb2e3e7c559481def357944e7b2311dbbbb0e9",
+    "zh:ecb415bb67459aeff99d2495bae1864e1bd05a64f28b7c1ebd1e661d3a6863f6",
+  ]
+}
