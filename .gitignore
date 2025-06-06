@@ -28,3 +28,4 @@
 *.terraform.plan
 
 *instances_status.sh
+*master-node.yml
