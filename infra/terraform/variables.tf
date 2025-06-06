@@ -4,14 +4,12 @@ variable "namecom_api_token" {
   sensitive   = true
 }
 
-variable "have_you_added_your_ip_address_to_namecom_whitelist?" {
+variable "have_you_added_your_ip_address_to_namecom_whitelist_true_or_false" {
   description = "Have you added your IP address to Name.com's API access list? (https://www.name.com/account/api-access)"
   type        = bool
-  default     = false
 }
 
-variable "have_you_read_the_readme?" {
+variable "have_you_read_the_readme_true_or_false" {
   description = "Have you read the README.md file in this directory?"
   type        = bool
-  default     = false
 }
