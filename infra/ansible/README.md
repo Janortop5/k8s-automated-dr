@@ -19,26 +19,29 @@ ansible-playbook kubeadm.yml -i hosts
 
 2. **Access Prometheus UI**
 
-Locally (if you have kubectl configured):
-```bash
-kubectl -n monitoring port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090
-# → browse http://localhost:9090
-```
+  Locally (if you have kubectl configured):
+  ```bash
+  kubectl -n monitoring port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090
+  # → browse http://localhost:9090
+  ```
 
 3. **Via SSH tunnel (if you’re SSH’d into a node):**
-
-```bash
-ssh -N -L 9090:127.0.0.1:9090 ubuntu@<node-ip> -i k8s-cluster.pem
-# → browse http://localhost:9090
-```
+  First ssh into the node and run the port-foward command in step 2.
+  ```bash
+  ssh -N -L 9090:127.0.0.1:9090 ubuntu@<node-ip> -i k8s-cluster.pem
+  # → browse http://localhost:9090
+  ```
 
 4. **Check Targets & Sample Queries**
 
-Targets: In Prometheus UI → Status → Targets
+  Targets: In Prometheus UI → Status → Targets
 
 5. **Sample PromQL:**
 
-```promql
-rate(node_cpu_seconds_total{mode!="idle"}[5m])
-container_memory_usage_bytes{container!=""}
-```
+  ```promql
+  rate(node_cpu_seconds_total{mode!="idle"}[5m])
+  ```
+
+  ```promql
+  container_memory_usage_bytes{container!=""}
+  ```
