@@ -50,6 +50,6 @@ spec:
 Run the operator:
 
 ```bash
-python operator.py
+python dr_operator.py
 ```
 This provides a solid foundation that you can extend with your LSTM model integration, Prometheus metrics collection, and Velero backup orchestration as outlined.
