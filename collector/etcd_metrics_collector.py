@@ -1,9 +1,10 @@
+# etcd metrics currently not used in training, but can be used for future analysis
 import requests
 import pandas as pd
 import time
 import os
 
-def collect_prometheus_metrics(query, prometheus_url="http://localhost:9090"):
+def collect_prometheus_metrics(query, prometheus_url="http://prometheus-kube-prometheus-prometheus.monitoring.svc.local:9090"):
     response = requests.get(
         f"{prometheus_url}/api/v1/query",
         params={"query": query}
