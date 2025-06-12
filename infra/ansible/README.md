@@ -45,3 +45,24 @@ ansible-playbook kubeadm.yml -i hosts
   ```promql
   container_memory_usage_bytes{container!=""}
   ```
+
+
+### Data Syncing Commands
+
+## Setup Secrets
+
+```bash
+kubectl create secret generic rclone-secret -n monitoring \
+  --from-literal=rclone.conf="[s3]
+type = s3
+provider = AWS
+access_key_id = <secret_id>
+secret_access_key = <secret_key>
+region = <region-name>"
+```
+
+## Install chaos mesh
+```bash
+helm repo add chaos-mesh https://charts.chaos-mesh.org
+helm install chaos-mesh chaos-mesh/chaos-mesh -n chaos-testing --create-namespace
+```

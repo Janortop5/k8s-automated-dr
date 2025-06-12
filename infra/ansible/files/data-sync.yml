@@ -1,0 +1,361 @@
+---
+# 1. RBAC for metrics export job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-exporter
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-exporter
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services"]
+  verbs: ["get", "list"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-exporter
+subjects:
+- kind: ServiceAccount
+  name: prometheus-exporter
+  namespace: monitoring
+
+---
+# 2. ConfigMap with export script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-export-script
+  namespace: monitoring
+data:
+  export_metrics.py: |
+    #!/usr/bin/env python3
+    import requests
+    import json
+    import csv
+    import os
+    from datetime import datetime, timedelta
+    import time
+    
+    # Prometheus connection
+    PROM_URL = os.getenv('PROM_URL', 'http://prometheus-prometheus:9090')
+    
+    # Time range: last 5 minutes
+    end_time = datetime.now()
+    start_time = end_time - timedelta(minutes=5)
+    
+    def query_prometheus(query, start, end, step='30s'):
+        """Query Prometheus range API"""
+        url = f"{PROM_URL}/api/v1/query_range"
+        params = {
+            'query': query,
+            'start': start.timestamp(),
+            'end': end.timestamp(),
+            'step': step
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Error querying Prometheus: {e}")
+            return None
+    
+    def flatten_prometheus_data(result, metric_name):
+        """Flatten Prometheus response into rows"""
+        rows = []
+        if not result or result.get('status') != 'success':
+            print(f"No data for {metric_name}")
+            return rows
+            
+        for series in result.get('data', {}).get('result', []):
+            labels = series.get('metric', {})
+            for timestamp, value in series.get('values', []):
+                row = {
+                    'timestamp': datetime.fromtimestamp(float(timestamp)).isoformat(),
+                    'metric_name': metric_name,
+                    'value': float(value),
+                    **labels  # Include all labels as columns
+                }
+                rows.append(row)
+        return rows
+    
+    # Define your metrics queries
+    metrics_queries = {
+        # CPU allocation efficiency (requests vs usage)
+        'cpu_allocation_efficiency': '''
+        (
+          (rate(container_cpu_usage_seconds_total{container!="POD",container!=""}[5m]) * 100) /
+          (kube_pod_container_resource_requests{resource="cpu"} > 0)
+        ) * 100
+        ''',
+        
+        # Memory allocation efficiency (requests vs usage)  
+        'memory_allocation_efficiency': '''
+        (
+          container_memory_working_set_bytes{container!="POD",container!=""} /
+          (kube_pod_container_resource_requests{resource="memory"} > 0)
+        ) * 100
+        ''',
+        
+        # Disk I/O (read + write bytes per second)
+        'disk_io': '''
+        rate(container_fs_reads_bytes_total[5m]) + rate(container_fs_writes_bytes_total[5m])
+        ''',
+        
+        # Network latency (if you have blackbox exporter)
+        'network_latency': '''
+        probe_duration_seconds{job="blackbox"}
+        ''',
+        
+        # Node temperature (if available via node exporter)
+        'node_temperature': '''
+        node_hwmon_temp_celsius
+        ''',
+        
+        # Node CPU usage percentage
+        'node_cpu_usage': '''
+        100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+        ''',
+        
+        # Node memory usage percentage
+        'node_memory_usage': '''
+        (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+        ''',
+        
+        # Pod lifetime in seconds
+        'pod_lifetime_seconds': '''
+        time() - kube_pod_created
+        '''
+    }
+    
+    # Collect all metrics
+    all_rows = []
+    
+    for metric_name, query in metrics_queries.items():
+        print(f"Collecting {metric_name}...")
+        result = query_prometheus(query, start_time, end_time)
+        rows = flatten_prometheus_data(result, metric_name)
+        all_rows.extend(rows)
+        time.sleep(1)  # Be nice to Prometheus
+    
+    # Write to CSV
+    if all_rows:
+        output_file = '/export-out/prometheus_metrics.csv'
+        
+        # Get all unique field names
+        fieldnames = set()
+        for row in all_rows:
+            fieldnames.update(row.keys())
+        fieldnames = sorted(list(fieldnames))
+        
+        with open(output_file, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_rows)
+        
+        print(f"Exported {len(all_rows)} records to {output_file}")
+        
+        # Also create JSON version
+        json_file = '/export-out/prometheus_metrics.json'
+        with open(json_file, 'w') as jsonfile:
+            json.dump(all_rows, jsonfile, indent=2)
+        print(f"Also exported to {json_file}")
+    else:
+        print("No metrics data collected")
+
+---
+# 3. CronJob for metrics export every 2 hours
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: prometheus-metrics-export
+  namespace: monitoring
+spec:
+  schedule: "0 */2 * * *"  # Every 2 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: prometheus-exporter
+          restartPolicy: Never
+          volumes:
+          - name: export-script
+            configMap:
+              name: prometheus-export-script
+              defaultMode: 0755
+          - name: export-out
+            emptyDir: {}
+          - name: rclone-config
+            secret:
+              secretName: rclone-secret  # Your existing rclone secret
+          containers:
+          - name: metrics-exporter
+            image: python:3.11-slim
+            command: ["/bin/bash"]
+            args:
+            - -c
+            - |
+              set -e
+              echo "Installing dependencies..."
+              pip install requests
+              
+              echo "Running metrics export..."
+              python /scripts/export_metrics.py
+              
+              echo "Files created:"
+              ls -la /export-out/
+              
+              echo "Installing rclone..."
+              curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
+              unzip rclone-current-linux-amd64.zip
+              cp rclone-*-linux-amd64/rclone /usr/bin/
+              chmod 755 /usr/bin/rclone
+              
+              echo "Syncing to S3..."
+              rclone copy /export-out/ s3:disastermetrics/prometheus-metrics/$(date +%Y/%m/%d/%H%M%S)/ -v
+              
+              echo "Export completed successfully!"
+            env:
+            - name: PROM_URL
+              value: "http://prometheus-prometheus:9090"
+            volumeMounts:
+            - name: export-script
+              mountPath: /scripts
+            - name: export-out
+              mountPath: /export-out
+            - name: rclone-config
+              mountPath: /root/.config/rclone
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+
+---
+# 4. ServiceMonitor to ensure all needed metrics are scraped
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  endpoints:
+  - port: http-metrics
+
+---
+# 5. Chaos Mesh installation
+# helm repo add chaos-mesh https://charts.chaos-mesh.org
+# helm install chaos-mesh chaos-mesh/chaos-mesh -n chaos-testing --create-namespace
+
+---
+# 6. CPU Stress Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cpu-stress-test
+  namespace: chaos-testing
+spec:
+  mode: one  # or 'all', 'fixed', 'fixed-percent', 'random-max-percent'
+  selector:
+    namespaces:
+      - default  # Target namespace - adjust as needed
+    labelSelectors:
+      "app": "new-pos"  # target specific pods
+  stressors:
+    cpu:
+      workers: 4  # Number of CPU stress workers
+      load: 80    # CPU load percentage per worker
+  duration: "5m"  # Run for 5 minutes
+  # Uncomment to schedule automatically:
+  # scheduler:
+  #   cron: "*/30 * * * *"  # Every 30 minutes
+
+---
+# 7. Memory Stress Chaos Experiment  
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: memory-stress-test
+  namespace: chaos-testing
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      "app": "your-app-label"
+  stressors:
+    memory:
+      workers: 2
+      size: "1GB"  # Memory to allocate
+  duration: "5m"
+  # Schedule automatically:
+  # scheduler:
+  #   cron: "0 */4 * * *"  # Every 4 hours
+
+---
+# 8. Manual trigger job template (run on-demand)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: manual-metrics-export
+  namespace: monitoring
+spec:
+  template:
+    spec:
+      serviceAccountName: prometheus-exporter
+      restartPolicy: Never
+      volumes:
+      - name: export-script
+        configMap:
+          name: prometheus-export-script
+          defaultMode: 0755
+      - name: export-out
+        emptyDir: {}
+      - name: rclone-config
+        secret:
+          secretName: rclone-secret
+      containers:
+      - name: metrics-exporter
+        image: python:3.11-slim
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          set -e
+          pip install requests
+          python /scripts/export_metrics.py
+          apt-get update && apt-get install -y curl unzip
+          curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          unzip rclone-current-linux-amd64.zip
+          cp rclone-*-linux-amd64/rclone /usr/bin/
+          chmod 755 /usr/bin/rclone
+          rclone copy /export-out/ s3:disastermetrics/prometheus-metrics/manual-$(date +%Y%m%d-%H%M%S)/ -v
+        env:
+        - name: PROM_URL
+          value: "http://prometheus-kube-prometheus-prometheus:9090"
+        volumeMounts:
+        - name: export-script
+          mountPath: /scripts
+        - name: export-out
+          mountPath: /export-out
+        - name: rclone-config
+          mountPath: /root/.config/rclone
