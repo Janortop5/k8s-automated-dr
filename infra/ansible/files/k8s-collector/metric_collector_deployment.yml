@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-metrics-collector
+  labels:
+    app: metrics-collector
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics-collector
+  template:
+    metadata:
+      labels:
+        app: metrics-collector
+    spec:
+      serviceAccountName: metrics-collector
+      containers:
+      - name: metrics-collector
+        image: freshinit/metrics-collector:latest
+        env:
+        - name: PROMETHEUS_URL
+          value: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+        - name: MODEL_ENDPOINT
+          value: "http://lstm-model-service.monitoring.svc.cluster.local/predict"
+        - name: COLLECTION_INTERVAL
+          value: "30"  # seconds
+        - name: SEQUENCE_LENGTH
+          value: "1"   # number of data points for LSTM
+        - name: USE_TIME_SERIES
+          value: "false"  # true for time series, false for single point collection
+        # Authentication (uncomment if needed)
+        # - name: PROMETHEUS_AUTH_TOKEN
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: prometheus-auth
+        #       key: token
+        # - name: PROMETHEUS_AUTH_USER
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: prometheus-auth
+        #       key: username
+        # - name: PROMETHEUS_AUTH_PASS
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: prometheus-auth
+        #       key: password
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import requests; requests.get('http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up', timeout=5)"
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import requests; requests.get('http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up', timeout=5)"
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-collector
+  namespace: monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metrics-collector
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metrics-collector
+subjects:
+- kind: ServiceAccount
+  name: metrics-collector
+  namespace: default
+
