@@ -2,16 +2,16 @@ module "ec2" {
   source = "./modules/ec2"
 }
 
-module "name_dot_com" {
-  source = "./modules/name_dot_com"
+# module "name_dot_com" {
+#   source = "./modules/name_dot_com"
 
-  # Pass in the variables for the domain setup
-  namecom_api_token = var.namecom_api_token # Pass as enviroment variable TF_VAR_namecom_api_token
-  namecom_username = "janortop5" 
-  domain_name = "eaaladejana.xyz"
-  jenkins_record_name = "jenkins"
-  record_ip = module.ec2.jenkins_public_ip
-}
+#   # Pass in the variables for the domain setup
+#   namecom_api_token = var.namecom_api_token # Pass as enviroment variable TF_VAR_namecom_api_token
+#   namecom_username = "janortop5" 
+#   domain_name = "eaaladejana.xyz"
+#   jenkins_record_name = "jenkins"
+#   record_ip = module.ec2.jenkins_public_ip
+# }
 
 module "ansible_setup" {
   source = "./modules/ansible_setup"
