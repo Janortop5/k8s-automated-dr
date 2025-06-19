@@ -12,10 +12,13 @@ This Jupyter notebook implements a proof-of-concept for an automated disaster re
 ## Repository Structure
 
 ```
-├── lstm-disaster-recovery.ipynb    # Main Jupyter notebook
-├── data/                           # Folder for raw and processed datasets
-├── requirements.txt                # Python dependencies
-└── README.md                       # This file
+├── lstm-disaster-recovery.ipynb    # Main notebook (~few MBs); contains code, visualizations & annotations
+├── data/                           # Raw & processed data (~MBs to GBs); CSVs, JSON, etc.
+├── model/                          # Trained models (~10MBs to 100s of MBs); saved LSTM weights or checkpoints
+├── scalers/                        # Serialized scalers (~KBs); e.g., pickle files for data normalization
+├── requirements.txt                # Dependency list (~1–5 KB); pip installable libraries
+└── README.md                       # Project overview (~1–10 KB); explains setup, usage & goals
+
 ```
 
 ---
@@ -24,7 +27,6 @@ This Jupyter notebook implements a proof-of-concept for an automated disaster re
 
 * **Python 3.11**  
 * **Conda** (optional, but recommended on macOS)  
-* **Git** (to clone the repo)
 
 ---
 
@@ -77,11 +79,11 @@ This notebook requires the following Python libraries:
     ```
 
 3. (Optional) Register as a kernel:
-```bash
-pip install ipykernel
-python -m ipykernel install --user \
-    --name k8s-lstm --display-name "Python (fyp)"
-```
+    ```bash
+    pip install ipykernel
+    python -m ipykernel install --user \
+        --name k8s-lstm --display-name "Python (fyp)"
+    ```
 
 ## Dataset
 
