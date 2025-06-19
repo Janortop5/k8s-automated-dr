@@ -22,18 +22,14 @@ This Jupyter notebook implements a proof-of-concept for an automated disaster re
 
 This notebook requires the following Python libraries:
 
-* Python 3.8+
-* torch
-* pandas
-* numpy
-* scikit-learn
-* matplotlib (for plotting training curves)
-
-Install the dependencies with:
-
-```bash
-pip install -r requirements.txt
-```
+* Python 3.11
+* pandas>=1.3.0
+* numpy>=1.21.0
+* scikit-learn>=1.0.0
+* matplotlib>=3.4.0
+* notebook>=6.5.0
+* seaborn>=0.13.2
+* tensorflow==2.15.0
 
 ## Dataset
 
