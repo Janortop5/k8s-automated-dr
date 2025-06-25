@@ -35,7 +35,7 @@ spec:
         - name: ALERT_MEMORY_THRESHOLD
           value: "40.0" 
         - name: SLACK_WEBHOOK_URL
-          value: "https://hooks.slack.com/services/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" 
+          value: "" 
         - name: ALERT_COOLDOWN_SECONDS
           value: "300" 
         # - name: TEAMS_WEBHOOK_URL
