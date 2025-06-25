@@ -30,6 +30,17 @@ spec:
           value: "1"   # number of data points for LSTM
         - name: USE_TIME_SERIES
           value: "false"  # true for time series, false for single point collection
+        - name: ALERT_CPU_THRESHOLD
+          value: "40.0" 
+        - name: ALERT_MEMORY_THRESHOLD
+          value: "40.0" 
+        - name: SLACK_WEBHOOK_URL
+          value: "https://hooks.slack.com/services/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" 
+        - name: ALERT_COOLDOWN_SECONDS
+          value: "300" 
+        # - name: TEAMS_WEBHOOK_URL
+        #   value: "false" 
+      
         # Authentication (uncomment if needed)
         # - name: PROMETHEUS_AUTH_TOKEN
         #   valueFrom:
