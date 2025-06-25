@@ -51,7 +51,7 @@
 
 - name: Copy OIDC init script into Jenkins
   copy:
-    src: oidc-init.groovy
+    src: jenkins/oidc-init.groovy
     dest: /var/lib/jenkins/init.groovy.d/01-oidc.groovy
     owner: jenkins
     group: jenkins

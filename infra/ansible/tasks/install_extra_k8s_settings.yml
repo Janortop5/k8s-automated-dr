@@ -26,7 +26,7 @@
 
 - name: Copy audit policy to control-plane
   copy:
-    src: audit-policy.yaml
+    src: k8s-metrics-data/audit-policy.yaml
     dest: /etc/kubernetes/audit-policy.yaml
     owner: root
     group: root

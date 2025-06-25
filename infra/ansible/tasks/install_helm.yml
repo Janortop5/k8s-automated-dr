@@ -61,7 +61,7 @@
 
 - name: Push Prometheus values to remote
   ansible.builtin.copy:
-    src: values-prometheus.yaml
+    src: k8s-observability/values-prometheus.yaml
     dest: /tmp/values-prometheus.yaml
     mode: '0644'
     
