@@ -121,42 +121,42 @@
     state: absent
   notify: reload nginx
 
-- name: Install Certbot + Nginx plugin
-  apt:
-    name:
-      - certbot
-      - python3-certbot-nginx
-    state: present
-    update_cache: yes
+# - name: Install Certbot + Nginx plugin
+#   apt:
+#     name:
+#       - certbot
+#       - python3-certbot-nginx
+#     state: present
+#     update_cache: yes
 
-- name: Obtain or renew Let's Encrypt certificate for Jenkins
-  command: >
-    certbot --nginx
-            --non-interactive
-            --agree-tos
-            --email {{ letsencrypt_email }}
-            --redirect
-            -d {{ jenkins_domain }}
-  args:
-    creates: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
-  notify: reload nginx
+# - name: Obtain or renew Let's Encrypt certificate for Jenkins
+#   command: >
+#     certbot --nginx
+#             --non-interactive
+#             --agree-tos
+#             --email {{ letsencrypt_email }}
+#             --redirect
+#             -d {{ jenkins_domain }}
+#   args:
+#     creates: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
+#   notify: reload nginx
 
-- name: Remove temporary HTTP-only site file
-  file:
-    path: "/etc/nginx/sites-available/jenkins-temp.conf"
-    state: absent
+# - name: Remove temporary HTTP-only site file
+#   file:
+#     path: "/etc/nginx/sites-available/jenkins-temp.conf"
+#     state: absent
 
-- name: Remove temporary symlink in sites-enabled
-  file:
-    path: "/etc/nginx/sites-enabled/jenkins-temp.conf"
-    state: absent
-  notify: reload nginx
+# - name: Remove temporary symlink in sites-enabled
+#   file:
+#     path: "/etc/nginx/sites-enabled/jenkins-temp.conf"
+#     state: absent
+#   notify: reload nginx
 
-- name: Ensure Certbot timer is enabled
-  systemd:
-    name: certbot.timer
-    enabled: true
-    state: started
+# - name: Ensure Certbot timer is enabled
+#   systemd:
+#     name: certbot.timer
+#     enabled: true
+#     state: started
 
 - name: Read initial admin password from Jenkins filesystem2
   slurp:
