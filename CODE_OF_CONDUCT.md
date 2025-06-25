@@ -109,5 +109,4 @@ For questions about this Code of Conduct, please open an issue or contact the pr
 ---
 
 **Version**: 1.0  
-**Last Updated**: [DATE]  
-**Next Review**: [DATE + 6 months]
+**Last Updated**: [Wed 25, 2025]  

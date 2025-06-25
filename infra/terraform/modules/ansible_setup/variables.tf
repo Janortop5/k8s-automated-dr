@@ -12,7 +12,8 @@ variable "local_exec" {
     host_inventory = { filename = "../ansible/hosts" },
     ansible_config = { filename = "../ansible/ansible.cfg" },
     ansible_playbook = { playbook = "../ansible/playbook.yml", kubeadm = "../ansible/kubeadm.yml", jenkins = "../ansible/jenkins.yml" },
-    ansible_vars = { filename = "../ansible/host_vars/master-node.yml" },
+    ansible_vars = { master-node = "../ansible/host_vars/master-node.yml", 
+                    jenkins-node = "../ansible/group_vars/all.yml" },
   }
 }
 

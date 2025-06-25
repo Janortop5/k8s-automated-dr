@@ -25,9 +25,18 @@ ${var.jenkins_ip}
 }
 
 resource "local_file" "master-node-vars" {
-  filename = "${var.local_exec.ansible_vars.filename}"
+  filename = "${var.local_exec.ansible_vars.master-node}"
 
   content = <<-EOF
   master_public_ip: "${var.master_ip}"
   EOF
 }
+
+resource "local_file" "jenkins-node-vars" {
+  filename = "${var.local_exec.ansible_vars.jenkins-node}"
+
+  content = <<-EOF
+  jenkins_public_ip: "${var.jenkins_ip}"
+  EOF
+}
+
