@@ -27,7 +27,7 @@ class PredictionRequest(BaseModel):
     data: List[List[float]]  # 2D array for sequence data
     
 class PredictionResponse(BaseModel):
-    predictions: List[float]
+    predictions: dict
     status: str
 
 def disaster_aware_loss(threshold=0.7, disaster_penalty_weight=2.0):
@@ -128,17 +128,19 @@ async def predict(request: PredictionRequest):
         
         # Inverse transform the predictions
         predictions = scaler_targets.inverse_transform(predictions)
+        cpu_usage, mem_usage = predictions[0], predictions[1]
+        predictions = {"cpu_usage": cpu_usage, "mem_usage": mem_usage}
         
         # Convert predictions to list
-        if len(predictions.shape) > :
-            pred_list = predictions.flatten().tolist()
-        else:
-            pred_list = predictions.tolist()
+        # if len(predictions.shape) > 1:
+        #     pred_list = predictions.flatten().tolist()
+        # else:
+        #     pred_list = predictions.tolist()
         
-        logger.info(f"Predictions: {pred_list}")
+        logger.info(f"Predictions: {predictions}")
         
         return PredictionResponse(
-            predictions=pred_list,
+            predictions=predictions,
             status="success"
         )
         
