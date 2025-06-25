@@ -7,10 +7,18 @@ resource "aws_instance" "ec2_instance-1-2" {
   vpc_security_group_ids = [aws_security_group.ec2_instance_sg.id]
   availability_zone      = each.value.az
 
+  root_block_device {
+    volume_size = 20
+    delete_on_termination = true
+  }
+
   tags = {
     Name = each.key
   }
+  
 }
+
+
 resource "aws_eip" "az1" {
   for_each = aws_instance.ec2_instance-1-2
   
@@ -33,7 +41,12 @@ resource "aws_instance" "ec2_instance-3-4" {
   subnet_id              = aws_subnet.public_subnets[var.public_subnets.k8s-project-public-2.key].id
   vpc_security_group_ids = [aws_security_group.ec2_instance_sg.id]
   availability_zone      = each.value.az
-
+ 
+  root_block_device {
+    volume_size = 20
+    delete_on_termination = true
+  }
+  
   tags = {
     Name = each.key
   }
