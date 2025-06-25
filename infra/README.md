@@ -1,7 +1,10 @@
 # Setup Jenkins for k8s-automated-dr
+AFTER RUNNING THE INFRA's TERRAFORM CODE AND ANSIBLE TASKS.
+
 Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub repo so every push kicks off a build.
 
 ## 0  Login and Create User
+1. Access the Jenkins server on `https://<jenkins-node-ip>.nip.io/`
 1. Copy the Initial Jenkins Admin password from the Ansible task 'Set Jenkins admin password fact' and paste in the Initial password page.
 2. In the plugins page, select the option to install the suggested plugins.
 3. Create the First Admin User and Password.

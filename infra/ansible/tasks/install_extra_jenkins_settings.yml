@@ -134,12 +134,55 @@
     certbot --nginx
             --non-interactive
             --agree-tos
-            --standalone
             --email {{ letsencrypt_email }}
             --redirect
             -d {{ jenkins_domain }}
   args:
     creates: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
+  notify: reload nginx
+
+- name: Create persistent HTTPS Nginx site for Jenkins
+  copy:
+    dest: /etc/nginx/sites-available/jenkins-ssl.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      server {
+          listen 443 ssl http2;
+          server_name {{ jenkins_domain }};
+
+          ssl_certificate     /etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/{{ jenkins_domain }}/privkey.pem;
+
+          # (basic hardening)
+          ssl_session_cache   shared:SSL:10m;
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_prefer_server_ciphers on;
+
+          location / {
+              proxy_pass          http://127.0.0.1:8080;
+              proxy_set_header    Host              $host;
+              proxy_set_header    X-Real-IP         $remote_addr;
+              proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
+              proxy_set_header    X-Forwarded-Proto $scheme;
+              proxy_buffering     off;
+          }
+      }
+
+      # Keep port-80 for LE renewals + redirect
+      server {
+          listen 80;
+          server_name {{ jenkins_domain }};
+          return 301 https://$host$request_uri;
+      }
+  notify: reload nginx
+
+- name: Enable Jenkins HTTPS site
+  file:
+    src: /etc/nginx/sites-available/jenkins-ssl.conf
+    dest: /etc/nginx/sites-enabled/jenkins-ssl.conf
+    state: link
   notify: reload nginx
 
 - name: Remove temporary HTTP-only site file
