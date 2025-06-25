@@ -1,29 +1,22 @@
 import time
 import requests
-import logging
+from loguru import logger
 import os
-import json
 from datetime import datetime, timezone
-from typing import List, Dict, Optional, Union
-import threading
+from typing import List, Dict, Optional
 import signal
 import sys
 from collections import deque
 import statistics
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from alert_manager import AlertManager
 
 class PrometheusMetricsCollector:
     def __init__(self):
         self.prometheus_url = os.getenv('PROMETHEUS_URL', 'http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090')
         self.model_endpoint = os.getenv('MODEL_ENDPOINT', 'http://lstm-model-service.monitoring.svc.cluster.local/predict')
         self.collection_interval = int(os.getenv('COLLECTION_INTERVAL', '30'))  # seconds
-        self.sequence_length = int(os.getenv('SEQUENCE_LENGTH', '10'))  # number of data points for LSTM
+        self.sequence_length = int(os.getenv('SEQUENCE_LENGTH', '1'))  # number of data points for LSTM
+        self.alert_manager = AlertManager()  # Initialize the alert manager
         self.auth_token = os.getenv('PROMETHEUS_AUTH_TOKEN')  # Optional Bearer token
         self.auth_user = os.getenv('PROMETHEUS_AUTH_USER')    # Optional basic auth user
         self.auth_pass = os.getenv('PROMETHEUS_AUTH_PASS')    # Optional basic auth password
@@ -101,7 +94,7 @@ class PrometheusMetricsCollector:
             
             return data['data']['result']
             
-        except requestsexceptions.RequestException as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Error querying Prometheus: {e}")
             return None
         except Exception as e:
@@ -191,14 +184,14 @@ class PrometheusMetricsCollector:
             metrics = {}
             
             for metric_name, query in self.metrics_queries.items():
-                logger.debug(f"Querying {metric_name}: {query}")
+                logger.info(f"Querying {metric_name}: {query}")
                 results = self.query_prometheus_single(query)
                 
                 if results:
                     # Aggregate values across all instances/nodes
                     aggregated_value = self.aggregate_metric_values(results, 'mean')
                     metrics[metric_name] = aggregated_value
-                    logger.debug(f"{metric_name}: {aggregated_value}")
+                    logger.info(f"{metric_name}: {aggregated_value}")
                 else:
                     logger.warning(f"No data returned for {metric_name}")
                     metrics[metric_name] = 0.0
@@ -218,7 +211,7 @@ class PrometheusMetricsCollector:
             # Get time series for each metric
             all_series = {}
             for metric_name, query in self.metrics_queries.items():
-                logger.debug(f"Querying time series for {metric_name}")
+                logger.info(f"Querying time series for {metric_name}")
                 results = self.query_prometheus_range(query, duration)
                 
                 if results:
@@ -315,11 +308,18 @@ class PrometheusMetricsCollector:
             if response.status_code == 200:
                 result = response.json()
                 logger.info(f"Prediction successful: {result}")
+                    
+                # Check predictions against thresholds
+                if result and 'predictions' in result:
+                    alerts = self.alert_manager.check_prediction(result['predictions'])
+                    if alerts:
+                        logger.warning(f"Generated alerts: {alerts}")
+                    
                 return result
             else:
                 logger.error(f"Prediction failed: {response.status_code} - {response.text}")
                 return None
-                
+                    
         except Exception as e:
             logger.error(f"Error sending prediction request: {e}")
             return None
@@ -356,20 +356,20 @@ class PrometheusMetricsCollector:
         logger.info("Starting metrics collection...")
         
         while self.running:
-            try:
-                if use_time_series:
-                    self.run_time_series_collection()
-                else:
-                    self.run_single_collection()
+            # try:
+            if use_time_series:
+                self.run_time_series_collection()
+            else:
+                self.run_single_collection()
+            
+            time.sleep(self.collection_interval)
                 
-                time.sleep(self.collection_interval)
-                
-            except KeyboardInterrupt:
-                logger.info("Received interrupt signal, stopping...")
-                self.running = False
-            except Exception as e:
-                logger.error(f"Error in collection loop: {e}")
-                time.sleep(self.collection_interval)
+            # except KeyboardInterrupt:
+            #     logger.info("Received interrupt signal, stopping...")
+            #     self.running = False
+            # except Exception as e:
+            #     logger.error(f"Error in collection loop: {e}")
+            #     time.sleep(self.collection_interval)
     
     def stop(self):
         """Stop the collector"""
@@ -392,9 +392,9 @@ if __name__ == "__main__":
     # Choose collection mode
     use_time_series = os.getenv('USE_TIME_SERIES', 'false').lower() == 'true'
     
-    # try:
-    collector.run_collector(use_time_series=use_time_series)
-    # except Exception as e:
-    #     logger.error(f"Fatal error: {e}")
-    #     sys.exit(1)
+    try:
+        collector.run_collector(use_time_series=use_time_series)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        sys.exit(1)
 
