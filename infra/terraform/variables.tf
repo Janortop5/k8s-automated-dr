@@ -13,3 +13,15 @@
 #   description = "Have you read the README.md file in this directory?"
 #   type        = bool
 # }
+variable "aws_region" {
+  description = "AWS region for all resources"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "namecom_username" {
+  description = "Your Name.com account username"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

@@ -1,32 +1,29 @@
-resource "aws_vpc" "vpc" {
-  cidr_block       = var.vpc_cidr_block
-  instance_tenancy = "default"
+###############################################################################
+# VPC  &  Subnets  (use locals, not vars)
+###############################################################################
 
-  tags = {
-    Name = var.tags.vpc
-  }
+resource "aws_vpc" "vpc" {
+  cidr_block = var.vpc_cidr_block
+  tags       = { Name = var.tags.vpc }
 }
 
+# ── PUBLIC subnets ───────────────────────────────────────────────────────────
 resource "aws_subnet" "public_subnets" {
-  for_each                = var.public_subnets
+  for_each                = local.public_subnets          # ← changed
   vpc_id                  = aws_vpc.vpc.id
   cidr_block              = each.value.cidr_block
-  availability_zone       = lookup(each.value, "az", null)
+  availability_zone       = each.value.az                 # ← no lookup
   map_public_ip_on_launch = true
-
-  tags = {
-    Name = each.key
-  }
+  tags                    = { Name = each.key }
 }
+
+# ── PRIVATE subnets ──────────────────────────────────────────────────────────
 resource "aws_subnet" "private_subnets" {
-  for_each          = var.private_subnets
+  for_each          = local.private_subnets               # ← changed
   vpc_id            = aws_vpc.vpc.id
   cidr_block        = each.value.cidr_block
-  availability_zone = lookup(each.value, "az", null)
-
-  tags = {
-    Name = each.key
-  }
+  availability_zone = each.value.az                       # ← no lookup
+  tags              = { Name = each.key }
 }
 
 resource "aws_internet_gateway" "internet_gateway" {

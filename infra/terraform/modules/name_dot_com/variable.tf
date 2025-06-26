@@ -1,15 +1,3 @@
-variable "namecom_username" {
-  description = "Your Name.com account username"
-  type        = string
-}
-
-variable "namecom_api_token" {
-  description = "Your Name.com API token (go to https://www.name.com/developers to generate one)"
-  type        = string
-  sensitive   = true
-  default     = null # Defaulting to null, but should be set via environment variable
-}
-
 variable "domain_name" {
   description = "The apex domain you manage in Name.com (e.g. example.com)"
   type        = string

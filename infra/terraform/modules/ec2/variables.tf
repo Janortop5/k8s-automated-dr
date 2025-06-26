@@ -1,99 +1,73 @@
-variable "aws_region" {
-  type    = string
-  default = "us-east-1"
-}
-
+########################
+# VPC & SUBNET SHAPES
+########################
 variable "vpc_cidr_block" {
-  type    = string
-  default = "10.0.0.0/16"
+  description = "CIDR block for the VPC"
+  type        = string
+  default     = "10.0.0.0/16"
 }
 
+# ── PUBLIC subnets ─────────────────────────────────────────
+# Keys stay identical ("k8s-project-public-1", …) but no AZ field:
 variable "public_subnets" {
-  type = map(any)
+  description = "Public subnet definitions (module fills in AZs automatically)"
+  type = map(object({
+    name       = string
+    cidr_block = string
+    key        = string
+  }))
   default = {
     "k8s-project-public-1" = {
       name       = "public-1"
-      az         = "us-east-1a"
       cidr_block = "10.0.1.0/24"
       key        = "k8s-project-public-1"
-    },
-
+    }
     "k8s-project-public-2" = {
       name       = "public-2"
-      az         = "us-east-1b"
       cidr_block = "10.0.2.0/24"
       key        = "k8s-project-public-2"
     }
   }
 }
 
+# ── PRIVATE subnets ────────────────────────────────────────
 variable "private_subnets" {
-  type = map(any)
+  description = "Private subnet definitions (AZs supplied inside module)"
+  type = map(object({
+    name       = string
+    cidr_block = string
+  }))
   default = {
     "k8s-project-private-1" = {
       name       = "private-1"
-      az         = "us-east-1a"
       cidr_block = "10.0.3.0/24"
-    },
-
+    }
     "k8s-project-private-2" = {
       name       = "private-2"
-      az         = "us-east-1b"
       cidr_block = "10.0.4.0/24"
     }
   }
 }
 
+########################
+# SECURITY-GROUP SHAPES
+########################
 variable "ec2_instance_sg" {
-  type = map(any)
+  description = "Metadata + allowed CIDRs for the node security group"
+  type = object({
+    name        = string
+    description = string
+    cidr_block  = list(string)      
+  })
   default = {
     name        = "ec2_instance_sg"
-    description = "security group for k8s-cluster ec2 instances"
+    description = "security group for k8s-cluster EC2 instances"
+    cidr_block  = ["0.0.0.0/0"]
   }
 }
 
 variable "ec2_instance_k8s_inbound_ports" {
-  type = list(object({
-    from_port = number
-    to_port   = number
-    protocol  = string
-    description = string
-  }))
-  default = [
-    {
-      from_port   = 6443
-      to_port     = 6443
-      protocol    = "tcp"
-      description = "Kubernetes API"
-    },
-    {
-      from_port   = 3000
-      to_port     = 10000
-      protocol    = "tcp"
-      description = "Application ports"
-    },
-    {
-      from_port   = 30000
-      to_port     = 32767
-      protocol    = "tcp"
-      description = "NodePort services"
-    },
-    {
-      from_port   = 179
-      to_port     = 179
-      protocol    = "tcp"
-      description = "Allow calico bgp"
-    },
-    {
-      from_port   = 10249
-      to_port     = 10259
-      protocol    = "tcp"
-      description = "Kubelet API"
-    }
-  ]
-}
-
-variable "ec2_instance_inbound_ports" {
+  description = "Ports that masters & workers need for Kubernetes traffic"
   type = list(object({
     from_port   = number
     to_port     = number
@@ -101,97 +75,53 @@ variable "ec2_instance_inbound_ports" {
     description = string
   }))
   default = [
-    {
-      from_port   = 22
-      to_port     = 22
-      protocol    = "tcp"
-      description = "SSH access"
-    },
-    {
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      description = "HTTP access"
-    },
-    {
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      description = "HTTPS access"
-    }
+    { from_port = 6443,  to_port = 6443,  protocol = "tcp", description = "Kubernetes API" },
+    { from_port = 3000,  to_port = 10000, protocol = "tcp", description = "Application ports" },
+    { from_port = 30000, to_port = 32767, protocol = "tcp", description = "NodePort services" },
+    { from_port = 179,   to_port = 179,   protocol = "tcp", description = "Calico BGP" },
+    { from_port = 10249, to_port = 10259, protocol = "tcp", description = "Kubelet API" },
   ]
 }
 
+variable "ec2_instance_inbound_ports" {
+  description = "Basic admin / web ingress to the nodes"
+  type = list(object({
+    from_port   = number
+    to_port     = number
+    protocol    = string
+    description = string
+  }))
+  default = [
+    { from_port = 22,  to_port = 22,  protocol = "tcp", description = "SSH"   },
+    { from_port = 80,  to_port = 80,  protocol = "tcp", description = "HTTP"  },
+    { from_port = 443, to_port = 443, protocol = "tcp", description = "HTTPS" },
+  ]
+}
+
+########################
+# ALB   (unchanged)
+########################
 variable "alb_sg" {
-  type = map(any)
+  description = "Metadata + allowed CIDRs for the ALB security group"
+  type = object({
+    name        = string
+    description = string
+    cidr_block  = list(string)
+  })
   default = {
     name        = "alb_sg"
-    description = "security group for k8s-cluster application load balancer"
+    description = "security group for k8s-cluster ALB"
+    cidr_block  = ["0.0.0.0/0"]
   }
-}
-
-variable "ec2_instance_sg_cidr_block" {
-  default = ["0.0.0.0/0"]
-}
-
-variable "ec2_instance_sg_k8s_cidr_block" {
-  default = ["0.0.0.0/0"]
-}
-
-variable "alb_sg_cidr_block" {
-  default = ["0.0.0.0/0"]
 }
 
 variable "alb_inbound_ports" {
   type    = list(number)
   default = [80, 443]
 }
-
-variable "ec2_instance_ami" {
-  type    = string
-  default = "ami-084568db4383264d4"
-}
-
-variable "ec2_instance_type" {
-  type    = string
-  default = "t3.small"
-}
-
-variable "ec2_instance_az1" {
-  type = map(any)
-  default = {
-    k8s-cluster-server-1 = {
-      az  = "us-east-1a"
-      key = "k8s-cluster-master"
-    }
-    k8s-cluster-server-2 = {
-      az  = "us-east-1a"
-      key = "k8s-cluster-worker-1"
-    }
-  }
-}
-
-variable "ec2_instance_az2" {
-  type = map(any)
-  default = {
-    k8s-cluster-server-3 = {
-      az  = "us-east-1b"
-      key = "k8s-cluster-worker-2"
-    }
-    jenkins-ci-server = {
-      az  = "us-east-1b"
-      key = "jenkins-ci-server"
-    }
-  }
-}
-
-variable "ec2_instance_key" {
-  type    = string
-  default = "k8s-cluster"
-}
-
+  
 variable "alb" {
-  type = map(any)
+  type = map(string)
   default = {
     name               = "k8s-lb"
     load_balancer_type = "application"
@@ -207,26 +137,14 @@ variable "alb_target_group" {
   }
 }
 
-# uncomment this if going with HTTP only
 variable "alb_listener_1" {
- type = map(any)
- default = {
-   port        = "80"
-   protocol    = "HTTP"
-   action_type = "forward"
- }
+  type = map(any)
+  default = {
+    port        = "80"
+    protocol    = "HTTP"
+    action_type = "forward"
+  }
 }
-
-## uncomment this if going with HTTPS
-# variable "alb_listener_1" {
-#   type = map(any)
-#   default = {
-#     port        = "80"
-#     protocol    = "HTTP"
-#     action_type = "redirect"
-#     status_code = "HTTP_301"
-#   }
-# }
 
 variable "alb_listener_2" {
   type = map(any)
@@ -234,46 +152,59 @@ variable "alb_listener_2" {
     port        = "443"
     protocol    = "HTTPS"
     action_type = "forward"
-    ssl_policy = "ELBSecurityPolicy-2016-08"
+    ssl_policy  = "ELBSecurityPolicy-2016-08"
   }
 }
 
-## uncomment this to provision DNS record
-# variable "domain" {
-#   type = map(any)
-#   default = {
-#     domain    = "eaaladejana.live"
-#     subdomain = "terraform-test.eaaladejana.live"
-#     type      = "A"
-#   }
-# }
-
-## uncomment this to provision SSL cert
-# variable "cert" {
-#   type = map(any)
-#   default = {
-#     cert_1 = {
-#       domain            = "eaaladejana.live"
-#       validation_method = "DNS"
-#     }
-
-#     cert_2 = {
-#       domain            = "terraform-test.eaaladejana.live"
-#       validation_method = "DNS"
-#     }
-#   }
-# }
-
-variable "namedotcom_username" {
-  default = ""
+########################
+# EC2 INSTANCE MAPS
+########################
+# 1st AZ workload map – keep variable name; module fills AZ later
+variable "ec2_instance_az1" {
+  type = map(object({
+    key = string
+  }))
+  default = {
+    k8s-cluster-server-1 = { key = "k8s-cluster-master"  }
+    k8s-cluster-server-2 = { key = "k8s-cluster-worker-1"}
+  }
 }
 
-variable "namedotcom_token" {
-  default = ""
+# 2nd AZ workload map
+variable "ec2_instance_az2" {
+  type = map(object({
+    key = string
+  }))
+  default = {
+    k8s-cluster-server-3 = { key = "k8s-cluster-worker-2"}
+    jenkins-ci-server    = { key = "jenkins-ci-server"   }
+  }
 }
 
+variable "ec2_instance_type" {
+  description = "Instance size for all nodes"
+  type        = string
+  default     = "t3.small"
+}
+
+# Allow an override; module will supply the latest Ubuntu AMI if null
+variable "ec2_instance_ami" {
+  description = "Custom AMI ID (leave blank to auto-select latest Ubuntu 22.04)"
+  type        = string
+  default     = ""
+}
+
+variable "ec2_instance_key" {
+  description = "Key-pair name injected into EC2 instances"
+  type        = string
+  default     = "k8s-cluster"
+}
+
+########################
+# TAGS  (unchanged)
+########################
 variable "tags" {
-  type = map(any)
+  type = map(string)
   default = {
     vpc              = "k8s-vpc"
     internet_gateway = "k8s-igw"
@@ -285,3 +216,4 @@ variable "tags" {
     cert             = "k8s-ssl-cert"
   }
 }
+

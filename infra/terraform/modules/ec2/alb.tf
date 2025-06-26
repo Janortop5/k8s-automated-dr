@@ -1,19 +1,35 @@
+###############################################################################
+# modules/ec2/alb.tf   – always exactly one subnet per AZ
+###############################################################################
+
+# 1) Group all public subnets by AZ
+locals {
+  # e.g. { "us-west-2a" = ["subnet-aaa"], "us-west-2b" = ["subnet-bbb","subnet-ccc"] }
+  alb_subnets_by_az = {
+    for sn in aws_subnet.public_subnets :
+    sn.availability_zone => sn.id...
+  }
+
+  # 2) Take the FIRST subnet in each list → map AZ → single subnet ID
+  alb_subnet_by_az = {
+    for az, ids in local.alb_subnets_by_az :
+    az => ids[0]
+  }
+
+  # 3) ALB wants a plain list
+  alb_subnet_ids = values(local.alb_subnet_by_az)
+}
+
 resource "aws_lb" "alb" {
   name               = var.alb.name
-  internal           = false
   load_balancer_type = var.alb.load_balancer_type
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public_subnets[var.public_subnets.k8s-project-public-1.key].id, aws_subnet.public_subnets[var.public_subnets.k8s-project-public-2.key].id]
+  internal           = false
 
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = local.alb_subnet_ids         
   enable_deletion_protection = false
 
-  depends_on = [
-    aws_security_group.alb_sg
-  ]
-
-  tags = {
-    Name = var.tags.alb
-  }
+  tags = { Name = var.tags.alb }
 }
 
 resource "aws_lb_target_group" "alb_target_group" {
@@ -23,17 +39,17 @@ resource "aws_lb_target_group" "alb_target_group" {
   vpc_id   = aws_vpc.vpc.id
 }
 
-resource "aws_lb_target_group_attachment" "alb_tg_attachment_1" {
-  for_each         = var.ec2_instance_az1
-  target_group_arn = aws_lb_target_group.alb_target_group.arn
-  target_id        = aws_instance.ec2_instance-1-2[each.key].id
-  port             = var.alb_target_group.port
+# Attach masters & workers (skip Jenkins) in one loop
+locals {
+  tg_targets = {
+    for k, v in local.all_instances :
+    k => v if can(regex("k8s-cluster-", v.key))
+  }
 }
 
-resource "aws_lb_target_group_attachment" "alb_tg-attachment_2" {
-  for_each         = var.ec2_instance_az2
+resource "aws_lb_target_group_attachment" "tg" {
+  for_each         = local.tg_targets
   target_group_arn = aws_lb_target_group.alb_target_group.arn
-  target_id        = aws_instance.ec2_instance-3-4[each.key].id
+  target_id        = aws_instance.nodes[each.key].id
   port             = var.alb_target_group.port
 }
-

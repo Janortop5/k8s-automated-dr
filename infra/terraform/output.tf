@@ -1,17 +1,9 @@
-output "instance_ids_1_2" {
-  value = module.ec2.instance_ids_1_2
+output "instance_ids" {
+  value = module.ec2.instance_ids
 }
 
-output "public_ips_1_2" {
-  value = module.ec2.public_ips_1_2
-}
-
-output "instance_ids_3_4" {
-  value = module.ec2.instance_ids_3_4
-}
-
-output "public_ips_3_4" {
-  value = module.ec2.public_ips_3_4
+output "public_ips" {
+  value = module.ec2.public_ips
 }
 
 output "check_ssh_script" {
@@ -35,7 +27,7 @@ output "cognito_client_id" {
 }
 
 output "cognito_client_secret" {
-  value = module.aws_openid.cognito_client_secret
+  value     = module.aws_openid.cognito_client_secret
   sensitive = true
 }
 

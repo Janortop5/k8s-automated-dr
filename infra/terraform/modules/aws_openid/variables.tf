@@ -1,8 +1,6 @@
 variable "aws_region" {
   description = "AWS Region to deploy Cognito resources in"
   type        = string
-  # Defaulting to 'us-east-1' as it is widely used and offers lower latency for most users.
-  default     = "us-east-1"
 }
 
 variable "aws_cognito_domain" {

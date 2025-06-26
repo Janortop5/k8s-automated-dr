@@ -10,7 +10,7 @@ resource "aws_security_group" "ec2_instance_sg" {
       to_port         = ingress.value.to_port
       protocol        = ingress.value.protocol
       description     = ingress.value.description
-      cidr_blocks     = var.ec2_instance_sg_k8s_cidr_block
+      cidr_blocks     = var.ec2_instance_sg.cidr_block
     }
   }
   
@@ -22,7 +22,7 @@ resource "aws_security_group" "ec2_instance_sg" {
       to_port         = ingress.value.to_port
       protocol        = ingress.value.protocol
       description     = ingress.value.description
-      cidr_blocks     = var.ec2_instance_sg_cidr_block
+      cidr_blocks     = var.ec2_instance_sg.cidr_block
     }
   }
 
@@ -51,7 +51,7 @@ resource "aws_security_group" "alb_sg" {
       from_port   = ingress.value
       to_port     = ingress.value
       protocol    = "tcp"
-      cidr_blocks = var.alb_sg_cidr_block
+      cidr_blocks = var.alb_sg.cidr_block
     }
   }
 
