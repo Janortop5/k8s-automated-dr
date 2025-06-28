@@ -93,6 +93,31 @@
   register: admin_conf_slurp
   run_once: true
 
+#######################################################################
+#  Make the kube-config easy to grab for the human operator
+#######################################################################
+
+# 1.  Save admin.conf on the **controller host** so you can `cat` or
+#     `scp` it after the play finishes.
+- name: Write kubeconfig to a local file for the operator
+  ansible.builtin.copy:
+    content: "{{ admin_conf_slurp.content | b64decode }}"
+    dest: "./kubeconfig-{{ inventory_hostname }}.yaml"
+    mode: "0600"
+  delegate_to: localhost
+  run_once: true
+
+# 2.  Echo a nice banner with the same content so you can copy-paste it
+#     straight from the Ansible output if you wish.
+- name: Display kubeconfig in the playbook output  # <- copy-paste helper
+  ansible.builtin.debug:
+    msg: |
+      ----------  KUBECONFIG (save as ~/.kube/config)  ----------
+      {{ admin_conf_slurp.content | b64decode }}
+      -----------------------------------------------------------
+  run_once: true
+#######################################################################
+
 - name: Ensure .kube dir in non-root user home
   ansible.builtin.file:
     path: "/home/{{ remote_user }}/.kube"

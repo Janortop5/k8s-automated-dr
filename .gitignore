@@ -30,3 +30,4 @@
 *master-node.yml
 **/anaconda_projects
 **/.ipynb_checkpoints
+**/group_vars/all.yml
