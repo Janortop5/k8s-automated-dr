@@ -49,8 +49,8 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
    * Kind: **username with password**
    * Username: *paste username*
    * Password: *paste the PAT*
-   * ID / Description: `github-pat` (or whatever you like)
-3. **Repeate for Dockerhub**
+   * ID / Description: `github-pat` 
+3. **Repeat for Dockerhub**
 
 
 
