@@ -96,25 +96,28 @@
 #######################################################################
 #  Make the kube-config easy to grab for the human operator
 #######################################################################
-
 # 1.  Save admin.conf on the **controller host** so you can `cat` or
 #     `scp` it after the play finishes.
-- name: Write kubeconfig to a local file for the operator
-  ansible.builtin.copy:
-    content: "{{ admin_conf_slurp.content | b64decode }}"
-    dest: "./kubeconfig-{{ inventory_hostname }}.yaml"
-    mode: "0600"
-  delegate_to: localhost
-  run_once: true
+- name: Fetch kubeconfig to control host
+  become: true                   # need root on the master to read the file
+  ansible.builtin.fetch:
+    src:  /etc/kubernetes/admin.conf
+    dest: "{{ playbook_dir }}/kubeconfig-{{ inventory_hostname }}.yaml"
+    flat: yes                    # put it exactly at dest, no host sub-dir
+  run_once: true                 # only do this once, from the first master
 
-# 2.  Echo a nice banner with the same content so you can copy-paste it
-#     straight from the Ansible output if you wish.
-- name: Display kubeconfig in the playbook output  # <- copy-paste helper
+# 2. Tell the operator where it is     
+- name: Show local path and copy/paste hint
   ansible.builtin.debug:
     msg: |
-      ----------  KUBECONFIG (save as ~/.kube/config)  ----------
-      {{ admin_conf_slurp.content | b64decode }}
-      -----------------------------------------------------------
+      -----------------------------------------------------------------
+      Saved kubeconfig to: {{ playbook_dir }}/kubeconfig-{{ inventory_hostname }}.yaml
+
+      Use it with:
+        export KUBECONFIG={{ playbook_dir }}/kubeconfig-{{ inventory_hostname }}.yaml
+        cat $KUBECONFIG
+        kubectl get nodes
+      -----------------------------------------------------------------
   run_once: true
 #######################################################################
 

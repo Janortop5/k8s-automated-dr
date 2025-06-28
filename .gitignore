@@ -27,6 +27,9 @@
 *.terraform.plan
 
 *instances_status.sh
+
+# ansible outputs
+*kubeconfig*
 *master-node.yml
 **/anaconda_projects
 **/.ipynb_checkpoints
