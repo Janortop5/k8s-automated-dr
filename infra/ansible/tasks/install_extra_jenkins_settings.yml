@@ -201,10 +201,3 @@
     name: certbot.timer
     enabled: true
     state: started
-
-- name: Read initial admin password from Jenkins filesystem2
-  slurp:
-    src: /var/lib/jenkins/secrets/initialAdminPassword
-  register: initial_pw
-  become: true
-  run_once: true
