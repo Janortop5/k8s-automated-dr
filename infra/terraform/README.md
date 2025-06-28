@@ -17,7 +17,7 @@ The terraform code output displays several important infrastructure information 
 * public_ips                   # the public ips of all the servers
 * check_ssh_script             # a status script that allow you check if servers are ready for ssh connection
 * master_public_ip             # the elastic ip of the k8s master node
-* worker_public_ips            # the elastic ip of the k8s worker nodex
+* worker_public_ips            # the elastic ip of the k8s worker nodes
 * jenkins_public_ip            # the elastic ip of the jenkins node
 * ansible_playbook_command     # command to run the playbook outside terraform (automation)
 * cognito_user_pool_id         # openid user pool

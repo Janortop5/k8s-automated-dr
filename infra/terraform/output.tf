@@ -34,3 +34,19 @@ output "cognito_client_secret" {
 output "jenkins_redirect_uri" {
   value = module.aws_openid.jenkins_redirect_uri
 }
+
+output "master_public_ip" {
+  value = module.ec2.master_public_ip
+}
+
+output "worker_public_ips" {
+  value = module.ec2.worker_public_ips
+}
+
+output "jenkins_public_ip" {
+  value = module.ec2.jenkins_public_ip
+}
+
+output "master_private_ip" {
+  value = module.ec2.master_private_ip
+}
