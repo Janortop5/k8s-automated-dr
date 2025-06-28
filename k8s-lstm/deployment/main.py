@@ -73,7 +73,7 @@ def load_model():
     """   
     try:    
         global model
-        model_path = "./kubernetes_lstm_disaster_recovery(2).h5"
+        model_path = os.getenv("MODEL_PATH", "./models/lstm_model.h5")
         model = keras.models.load_model(
             model_path,
             custom_objects={'loss_fn': disaster_aware_loss()}
