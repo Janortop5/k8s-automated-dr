@@ -11,10 +11,11 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
 
 ## 1  Install the needed plugins
 
-> THESE PLUGINS ARE ALREADY PART OF THE SUGGESTED DEFAULT PLUGINS SO SKIP THIS STEP. IF NOT AVAILABLE, MANUALLY INSTALL THEM.
+> THESE PLUGINS ARE ALREADY PART OF THE SUGGESTED DEFAULT PLUGINS SO SKIP THIS STEP. IF NOT AVAILABLE (e.g Kubernetes plugin), MANUALLY INSTALL THEM.
 1. **Manage Jenkins → Manage Plugins → Available**
 2. Search and install (no restart required for recent LTS versions):
 
+   * **Kubernetes** plugin (*add credentials to jenkins and enable remote actions*)
    * **GitHub** plugin (*adds web-hooks endpoint & creds helpers*)
    * **Git** plugin (already bundled in most installs)
    * **Pipeline** (if you want to use a `Jenkinsfile`, highly recommended)
