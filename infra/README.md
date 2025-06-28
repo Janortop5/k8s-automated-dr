@@ -20,7 +20,7 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
    * **Pipeline** (if you want to use a `Jenkinsfile`, highly recommended)
 
 
-## 2  Create a GitHub token for Jenkins
+## 2A  Create a GitHub token for Jenkins
 
 1. In GitHub **Settings → Developer settings → Personal access tokens**
 2. *Generate new token (classic)* → give it:
@@ -28,6 +28,15 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
    * **`repo`** (read your code)
    * **`admin:repo_hook`** (set up the webhook automatically)
      (*If you’d rather add the webhook by hand you can skip this scope.*)
+3. Copy the token – you’ll only see it once.
+
+## 2B  Create a Registry (e.g. Dockerhub) token for Jenkins
+
+1. In Dockerhub **Click on Avatar → Account settings → Personal access tokens**
+2. *Generate new token* → give it:
+
+   * **`Read & Write`** (read and write to your registry repositories)
+   * *access token description* → k8s-automated-dr
 3. Copy the token – you’ll only see it once.
 
 
@@ -41,6 +50,7 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
    * Username: *paste username*
    * Password: *paste the PAT*
    * ID / Description: `github-pat` (or whatever you like)
+3. **Repeate for Dockerhub**
 
 
 
