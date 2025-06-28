@@ -20,6 +20,7 @@ resource "local_file" "master-node-vars" {
 
   content = <<-EOF
   master_public_ip: "${var.master_ip}"
+  master_private_ip: "${var.master_private_ip}"
   EOF
 }
 

@@ -21,6 +21,10 @@ variable "master_ip" {
   type = string
 }
 
+variable "master_private_ip" {
+  type = string
+}
+
 variable "worker_ips" {
   type = map(string)
 }

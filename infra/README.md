@@ -4,7 +4,7 @@ AFTER RUNNING THE INFRA's TERRAFORM CODE AND ANSIBLE TASKS.
 Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub repo so every push kicks off a build.
 
 ## 0  Login and Create User
-1. Access the Jenkins server on `https://<jenkins-node-ip>.nip.io/`
+1. Access the Jenkins server on `https://<jenkins-node-ip>.nip.io/`. <-- this is generated from the ansible output.
 1. Copy the Initial Jenkins Admin password from the Ansible task 'Set Jenkins admin password fact' and paste in the Initial password page.
 2. In the plugins page, select the option to install the suggested plugins.
 3. Create the First Admin User and Password.
@@ -42,17 +42,79 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
 
 
 
-## 3  Add the token to Jenkins credentials
+## 3A  Add the token to Jenkins credentials
 
 1. **Manage Jenkins → Credentials → (choose global store)**
-2. **Add Credentials**
+2. **Add Credentials (GitHub)**
 
    * Kind: **username with password**
    * Username: *paste username*
    * Password: *paste the PAT*
    * ID / Description: `github-pat` 
 3. **Repeat for Dockerhub**
+4. **Add Credentials (Kubernetes)**
 
+   * Kind: **secret file**
+   * Filename: *upload file*
+   * ID / Description: `kubeconfig-prod` 
+> KUBECONFIG IS GENERATED IN THE ANSIBLE OUTPUT IN TASK * Show local kubeconfig path and copy/paste hint * in tasks file '*bootstrap_master.yml*'
+
+## 3B Configure Kubernetes Cloud in Jenkins
+1. Go to Manage Jenkins → Clouds → New Cloud
+2. Add a new Kubernetes cloud:
+
+   *Cloud name -> k8s-automated-dr
+   * Type -> kubernetes
+3. Fill in:
+
+   * Kubernetes URL (or leave blank if Jenkins runs inside the cluster)
+   * Attach your credentials
+   * Customize pod template if needed
+   * Test the connection
+
+
+> DIRECTIONS FOR THE ABOVE STEPS
+
+Where the token ends up & how Jenkins consumes it?
+* Playbook output
+The task writes a file named, e.g.,
+
+```bash
+./jenkins-kubeconfig.yaml
+```
+
+* Inside you will see:
+
+```yaml
+users:
+- name: jenkins
+  user:
+    token: eyJhbGciOiJSUzI1NiIsImtpZCI6I…   # ← plain JWT
+```
+
+The CA bundle is already Base-64, but the token is plain text – that’s
+exactly what the Kubernetes API expects.
+
+* Upload the file to Jenkins once: Manage Jenkins → Manage Credentials → (Global) → Add Credentials
+
+   Kind: Kubernetes configuration (kubeconfig)
+   File: select the jenkins-kubeconfig.yaml you just generated
+   Give it an ID such as k8s-jenkins-agent.
+
+* Tell the Kubernetes Cloud to use it: Manage Jenkins → Manage Nodes and Clouds → Configure Clouds → Kubernetes
+
+   Field	What to enter
+   Kubernetes URL	https://<master-PRIVATE-IP>:6443
+   Credentials	choose k8s-jenkins-agent
+   Kubernetes Namespace	default (or wherever you created the SA)
+   TLS / Certificate	Leave blank – the CA in the kube-config is enough
+
+* Save. The plugin loads the kube-config, extracts the token & CA, and starts using the API immediately.
+
+   Nothing else to copy – the token Jenkins needs is already inside the file.
+   Whenever the playbook refreshes the token (e.g. re-run in 24 h) just upload
+   the new kube-config or replace the credential file; Jenkins picks it up
+   without a restart.
 
 
 ## 4  Create the job

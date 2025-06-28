@@ -169,5 +169,106 @@
     state: restarted
   become: true
 
-  
+#######################################################################
+# Jenkins → Kubernetes service-account + kubeconfig                    #
+#######################################################################
+# 0. Ensure Python3 and pip exist (dist-agnostic)
+- name: Install python3 & pip on master
+  become: true
+  package:
+    name:
+      - python3                 # present on most images, but explicit is safe
+      - python3-pip             # Ubuntu/Debian
+  when:
+    - "'master-node' in group_names"
+    - ansible_pkg_mgr == "apt"
+
+- name: Install python3 & pip on master (Yum/RHEL/Amazon Linux)
+  become: true
+  package:
+    name:
+      - python3
+      - python3-pip
+  when:
+    - "'master-node' in group_names"
+    - ansible_pkg_mgr == "yum"
+
+- name: Install Kubernetes Python client (pip3)
+  become: true
+  pip:
+    name: kubernetes==27.2.0         
+    executable: pip3                  
+  when: "'master-node' in group_names"
+
+# --- 1. make sure the SA exists ---------------------------------
+- name: Ensure jenkins-agent service-account
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: ServiceAccount
+    name: jenkins-agent
+    namespace: default
+    state: present
+  environment:
+    KUBECONFIG: "{{ ansible_env.HOME }}/.kube/config"
+
+# --- 2. bind it to cluster-admin (wide-open but simple) ---------
+- name: Create 24-hour token for Jenkins agent
+  command: kubectl create token jenkins-agent --duration=24h
+  register: jenkins_token_cmd
+  become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: "'master-node' in group_names"
+
+- name: Read cluster CA (base64 already)
+  slurp:
+    src: /etc/kubernetes/pki/ca.crt
+  register: k8s_ca
+  become: true
+  when: "'master-node' in group_names"
+
+- name: Set facts for kube-config
+  set_fact:
+    jenkins_token: "{{ jenkins_token_cmd.stdout }}"
+    jenkins_ca_b64: "{{ k8s_ca.content }}"
+  no_log: true
+  when: "'master-node' in group_names"
+
+# --- 3. Write minimal kube-config on the control host ------------------
+- name: Write kubeconfig for Jenkins
+  copy:
+    dest: "{{ playbook_dir }}/jenkins-kubeconfig.yaml"
+    mode: '0600'
+    content: |
+      apiVersion: v1
+      kind: Config
+      clusters:
+      - name: kubernetes
+        cluster:
+          certificate-authority-data: {{ jenkins_ca_b64 }}
+          server: https://{{ master_private_ip }}:6443
+      users:
+      - name: jenkins
+        user:
+          token: "{{ jenkins_token }}"
+      contexts:
+      - name: jenkins@kubernetes
+        context: { cluster: kubernetes, user: jenkins }
+      current-context: jenkins@kubernetes
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: "'master-node' in group_names"
+
+- name: Show path of the kube-config
+  debug:
+    msg: |
+      -------------------------------------------------------------
+      Saved kubeconfig to:  {{ playbook_dir }}/jenkins-kubeconfig.yaml
+
+      In Jenkins → Manage → Clouds → Kubernetes:
+        • Kubernetes URL : https://{{ master_private_ip }}:6443
+        • Credentials    : upload that kube-config
+      -------------------------------------------------------------
+  run_once: true
 

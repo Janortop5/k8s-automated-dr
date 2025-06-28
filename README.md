@@ -89,8 +89,6 @@ The `/infra/terraform/` directory contains infrastructure-as-code for provisioni
 
 #### 3. Configure the Pipeline
 
-#### 4. Develop Pytorch LSTM
-
 #### 5. Build Operator
 
 #### 6. Perform Chaos test

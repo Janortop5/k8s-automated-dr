@@ -1,4 +1,4 @@
-# ansible-playbook-to-install-docker
+# Ansible Playbook
 *Fun project to develop, learn and build.
 
 ## How to use k8s_lstm_pipeline role
@@ -50,7 +50,7 @@ ansible-playbook kubeadm.yml -i hosts
 ### Data Syncing Commands
 
 ## Setup Secrets
-
+// REPLACED BY VELERO
 ```bash
 kubectl create secret generic rclone-secret -n monitoring \
   --from-literal=rclone.conf="[s3]
@@ -59,10 +59,4 @@ provider = AWS
 access_key_id = <secret_id>
 secret_access_key = <secret_key>
 region = <region-name>"
-```
-
-## Install chaos mesh
-```bash
-helm repo add chaos-mesh https://charts.chaos-mesh.org
-helm install chaos-mesh chaos-mesh/chaos-mesh -n chaos-testing --create-namespace
 ```

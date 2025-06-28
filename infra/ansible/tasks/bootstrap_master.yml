@@ -107,7 +107,7 @@
   run_once: true                 # only do this once, from the first master
 
 # 2. Tell the operator where it is     
-- name: Show local path and copy/paste hint
+- name: Show local kubeconfig path and copy/paste hint
   ansible.builtin.debug:
     msg: |
       -----------------------------------------------------------------

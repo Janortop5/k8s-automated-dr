@@ -39,9 +39,31 @@ output "jenkins_public_ip" {
   value       = aws_eip.nodes[local.jenkins_entry].public_ip
 }
 
-output "debug_public_subnets" {
+# ---------------------------------------------------------------------------
+# 1.  All private IPs, keyed by logical name  (masters, workers, Jenkins …)
+# ---------------------------------------------------------------------------
+output "private_ips" {
+  description = "Primary VPC-private IPs keyed by logical name"
+  value       = { for k, v in aws_instance.nodes : k => v.private_ip }
+}
+
+# ---------------------------------------------------------------------------
+# 2.  Convenience shortcuts (same pattern as your public-IP helpers)
+# ---------------------------------------------------------------------------
+output "master_private_ip" {
+  description = "Private IP of the control-plane node"
+  value       = aws_instance.nodes[local.master_entry].private_ip
+}
+
+output "worker_private_ips" {
+  description = "Private IPs of worker nodes"
   value = {
-    for k, sn in aws_subnet.public_subnets :
-    k => sn.availability_zone
+    worker-1 = aws_instance.nodes[local.worker1_entry].private_ip
+    worker-2 = aws_instance.nodes[local.worker2_entry].private_ip
   }
+}
+
+output "jenkins_private_ip" {
+  description = "Private IP of the Jenkins server"
+  value       = aws_instance.nodes[local.jenkins_entry].private_ip
 }
