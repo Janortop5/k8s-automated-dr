@@ -42,7 +42,9 @@
     state: present
   become: true
 
-# 3) Clean out *any* existing audit mounts/volumes so we start idempotent
+###################################################
+# 3) Ensure Python3 and pip exist (dist-agnostic) #
+###################################################
 - name: Remove existing audit-policy mount
   command: >
     yq eval -i '
@@ -106,8 +108,11 @@
     ' /etc/kubernetes/manifests/kube-apiserver.yaml
   become: true
   notify: Restart kubelet
+#######################################################
 
-# 4) Insert the four audit blocks structurally via yq
+#######################################################
+# 4) Insert the four audit blocks structurally via yq #
+#######################################################
 - name: Add audit-policy mount to kube-apiserver
   command: >
     yq eval -i '
@@ -149,8 +154,11 @@
     ' /etc/kubernetes/manifests/kube-apiserver.yaml
   become: true
   notify: Restart kubelet
+##########################################################
 
-# 5) Lint the resulting manifest (80-char rule disabled)
+##########################################################
+# 5) Lint the resulting manifest (80-char rule disabled) #
+##########################################################
 - name: Lint kube-apiserver manifest (ignore line-length)
   command: >
     yamllint
@@ -161,24 +169,27 @@
   failed_when: lint_result.rc != 0
   changed_when: false
   become: true
+##############################################################################
 
-# 6) If lint passed, restart kubelet so API server picks up the new manifest
+##############################################################################
+# 6) If lint passed, restart kubelet so API server picks up the new manifest #
+##############################################################################
 - name: Restart kubelet to apply new kube-apiserver manifest
   service:
     name: kubelet
     state: restarted
   become: true
+###################################################
 
-#######################################################################
-# Jenkins → Kubernetes service-account + kubeconfig                    #
-#######################################################################
-# 0. Ensure Python3 and pip exist (dist-agnostic)
+###################################################
+#  Ensure Python3 and pip exist (dist-agnostic)   #
+###################################################
 - name: Install python3 & pip on master
   become: true
   package:
     name:
-      - python3                 # present on most images, but explicit is safe
-      - python3-pip             # Ubuntu/Debian
+      - python3
+      - python3-pip
   when:
     - "'master-node' in group_names"
     - ansible_pkg_mgr == "apt"
@@ -196,46 +207,76 @@
 - name: Install Kubernetes Python client (pip3)
   become: true
   pip:
-    name: kubernetes==27.2.0         
-    executable: pip3                  
+    name: kubernetes==27.2.0
+    executable: pip3
+  when: "'master-node' in group_names"
+#######################################################################
+
+#######################################################################
+# Jenkins namespace / SA / RBAC  +  kube-config for the plugin.       #
+#######################################################################
+# 0) Make sure the namespace exists
+- name: Namespace jenkins (idempotent)
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: jenkins
+    state: present
+  environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
   when: "'master-node' in group_names"
 
-# --- 1. make sure the SA exists ---------------------------------
-- name: Ensure jenkins-agent service-account
+# 1) ServiceAccount for the agents
+- name: ServiceAccount jenkins-agent
   kubernetes.core.k8s:
     api_version: v1
     kind: ServiceAccount
     name: jenkins-agent
-    namespace: default
+    namespace: jenkins
     state: present
-  environment:
-    KUBECONFIG: "{{ ansible_env.HOME }}/.kube/config"
+  environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
 
-# --- 2. bind it to cluster-admin (wide-open but simple) ---------
-- name: Create 24-hour token for Jenkins agent
-  command: kubectl create token jenkins-agent --duration=24h
-  register: jenkins_token_cmd
-  become: true
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
+# 2) Cluster-admin binding (wide-open but simple)
+- name: Bind SA to cluster-admin
+  kubernetes.core.k8s:
+    definition:                 # ← inline manifest (NOT template/src)
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: jenkins-agent-admin
+      subjects:
+        - kind: ServiceAccount
+          name: jenkins-agent
+          namespace: jenkins
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+    state: present
+  environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
   when: "'master-node' in group_names"
 
-- name: Read cluster CA (base64 already)
+# 3) Mint a short-lived (24 h) token for Jenkins
+- name: Create 24-h token for the SA
+  command: kubectl create token jenkins-agent -n jenkins --duration=24h
+  register: jenkins_token_cmd
+  environment: { KUBECONFIG: /etc/kubernetes/admin.conf }
+  when: "'master-node' in group_names"
+
+# 4) Grab the cluster CA (already base64)
+- name: Read cluster CA
   slurp:
     src: /etc/kubernetes/pki/ca.crt
   register: k8s_ca
-  become: true
   when: "'master-node' in group_names"
 
-- name: Set facts for kube-config
-  set_fact:
+# 5) Stash facts we’ll need to write the kube-config
+- set_fact:
     jenkins_token: "{{ jenkins_token_cmd.stdout }}"
     jenkins_ca_b64: "{{ k8s_ca.content }}"
-  no_log: true
   when: "'master-node' in group_names"
 
-# --- 3. Write minimal kube-config on the control host ------------------
-- name: Write kubeconfig for Jenkins
+# 6) Emit kube-config on the *control* host
+- name: Write kube-config for Jenkins
   copy:
     dest: "{{ playbook_dir }}/jenkins-kubeconfig.yaml"
     mode: '0600'
@@ -245,30 +286,40 @@
       clusters:
       - name: kubernetes
         cluster:
-          certificate-authority-data: {{ jenkins_ca_b64 }}
           server: https://{{ master_private_ip }}:6443
+          certificate-authority-data: {{ jenkins_ca_b64 }}
       users:
       - name: jenkins
         user:
           token: "{{ jenkins_token }}"
       contexts:
       - name: jenkins@kubernetes
-        context: { cluster: kubernetes, user: jenkins }
+        context:
+          cluster: kubernetes
+          user: jenkins
+          namespace: jenkins
       current-context: jenkins@kubernetes
   delegate_to: localhost
   run_once: true
   become: false
   when: "'master-node' in group_names"
 
-- name: Show path of the kube-config
+# 7) Tell the operator where it is
+- name: Show kube-config path + Jenkins hints
   debug:
     msg: |
-      -------------------------------------------------------------
+      -----------------------------------------------------------------
       Saved kubeconfig to:  {{ playbook_dir }}/jenkins-kubeconfig.yaml
 
-      In Jenkins → Manage → Clouds → Kubernetes:
-        • Kubernetes URL : https://{{ master_private_ip }}:6443
-        • Credentials    : upload that kube-config
-      -------------------------------------------------------------
-  run_once: true
+      In **Jenkins → Manage Credentials** add it as:
+        • Kind: *Kubernetes configuration (kubeconfig)*
+        • File : jenkins-kubeconfig.yaml
+        • ID   : k8s-jenkins-agent (for example)
 
+      Then in **Manage Nodes and Clouds → Kubernetes Cloud**:
+        • Kubernetes URL : https://{{ master_private_ip }}:6443
+        • Credentials    : k8s-jenkins-agent
+        • Namespace      : jenkins
+      -----------------------------------------------------------------
+  run_once: true
+#######################################################################

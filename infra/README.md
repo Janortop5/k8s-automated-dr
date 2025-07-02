@@ -52,12 +52,18 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
    * Password: *paste the PAT*
    * ID / Description: `github-pat` 
 3. **Repeat for Dockerhub**
-4. **Add Credentials (Kubernetes)**
+4. **Add Credentials (Kubernetes)**: It will be generated in ansible directory after running terraform/ansible
 
-   * Kind: **secret file**
-   * Filename: *upload file*
-   * ID / Description: `kubeconfig-prod` 
+   * a. 
+      * Kind: **secret file**
+      * Filename: *kubeconfig-<>.yaml*
+      * ID / Description: `kubeconfig-prod` 
+   * b.
+      * Kind: **secret file**
+      * Filename: *jenkins-kubeconfig.yaml *
+      * ID / Description: `k8s-jenkins-agent`     
 > KUBECONFIG IS GENERATED IN THE ANSIBLE OUTPUT IN TASK * Show local kubeconfig path and copy/paste hint * in tasks file '*bootstrap_master.yml*'
+
 
 ## 3B Configure Kubernetes Cloud in Jenkins
 1. Go to Manage Jenkins → Clouds → New Cloud
@@ -67,7 +73,7 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
    * Type -> kubernetes
 3. Fill in:
 
-   * Kubernetes URL (or leave blank if Jenkins runs inside the cluster)
+   * Kubernetes URL <--- Find in kubeconfig generated in ansible directory
    * Attach your credentials
    * Customize pod template if needed
    * Test the connection
@@ -80,6 +86,7 @@ Where the token ends up & how Jenkins consumes it?
 The task writes a file named, e.g.,
 
 ```bash
+./kubeconfig-<master_private_ip>.yaml
 ./jenkins-kubeconfig.yaml
 ```
 
@@ -90,6 +97,13 @@ users:
 - name: jenkins
   user:
     token: eyJhbGciOiJSUzI1NiIsImtpZCI6I…   # ← plain JWT
+```
+
+```yaml
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tL
 ```
 
 The CA bundle is already Base-64, but the token is plain text – that’s
@@ -103,10 +117,11 @@ exactly what the Kubernetes API expects.
 
 * Tell the Kubernetes Cloud to use it: Manage Jenkins → Manage Nodes and Clouds → Configure Clouds → Kubernetes
 
-   Field	What to enter
-   Kubernetes URL	https://<master-PRIVATE-IP>:6443
-   Credentials	choose k8s-jenkins-agent
-   Kubernetes Namespace	default (or wherever you created the SA)
+   Field	What to enter. 
+   Kubernetes URL	https://<master-PRIVATE-IP>:6443.
+   Kubernetes server certificate key -> copy value of `certificate-authority-data`.
+   Credentials	choose k8s-jenkins-agent.
+   Kubernetes Namespace	default -> 
    TLS / Certificate	Leave blank – the CA in the kube-config is enough
 
 * Save. The plugin loads the kube-config, extracts the token & CA, and starts using the API immediately.

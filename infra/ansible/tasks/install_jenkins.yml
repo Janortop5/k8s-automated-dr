@@ -28,32 +28,32 @@
   debug:
     msg: "{{ java_version.stderr_lines }}"
 
-- name: Ensure Jenkins keyring directory exists
+- name: Ensure APT keyrings directory exists
   file:
-    path: "{{ jenkins_key_dest | dirname }}"
+    path: /etc/apt/keyrings
     state: directory
-    mode: '0755'
+    mode: 0755
 
-- name: Download Jenkins APT signing key
+- name: Download Jenkins signing key
   get_url:
-    url: "{{ jenkins_key_url }}"
-    dest: "{{ jenkins_key_dest }}"
-    mode: '0644'
+    url: https://pkg.jenkins.io/debian/jenkins.io-2023.key
+    dest: /etc/apt/keyrings/jenkins-keyring.asc
+    mode: 0644
 
-- name: Add Jenkins APT repository
+- name: Add Jenkins weekly APT repository
   apt_repository:
-    repo: "deb [signed-by={{ jenkins_key_dest }}] {{ jenkins_repo_url }} {{ jenkins_repo_components }}"
+    repo: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian binary/"
+    filename: jenkins-weekly
     state: present
-
-- name: Update APT cache after adding Jenkins repo
-  apt:
     update_cache: yes
 
 - name: Install Jenkins
   apt:
     name: "{{ jenkins_pkg_name }}"
-    state: present
-
+    state: latest
+    update_cache: yes
+  register: jenkins_pkg
+  
 - name: Ensure Jenkins service is started
   service:
     name: jenkins
