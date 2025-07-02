@@ -4,9 +4,9 @@ openjdk_pkg_name: "openjdk-{{ java_major_version }}-jre"
 java_major_version: 21
 
 # Jenkins
-jenkins_key_url: "https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key"
+jenkins_key_url: "https://pkg.jenkins.io/debian/jenkins.io-2023.key"
 jenkins_key_dest: "/etc/apt/keyrings/jenkins-keyring.asc"
-jenkins_repo_url: "https://pkg.jenkins.io/debian-stable"
+jenkins_repo_url: "https://pkg.jenkins.io/debian"
 jenkins_repo_components: "binary/"
 jenkins_pkg_name: "jenkins"
 jenkins_domain: "jenkins.{{ jenkins_public_ip }}.nip.io"
