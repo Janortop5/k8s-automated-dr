@@ -7,7 +7,6 @@ pipeline {
     agent any                     // just give me any node that has Docker
     options {
         timestamps()
-        dockerFingerprintFrom 'true'     // records exactly which image sha was run
     }
 
     environment {
