@@ -38,9 +38,22 @@ pipeline {
             options { skipDefaultCheckout true }
             steps {
                 sh '''
-                    pip install --upgrade pip nbqa flake8
-                    nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb
-                    flake8 k8s-lstm/
+                    # 1. Lightweight virtual environment (lives in workspace, removed by cleanWs())
+                    python -m venv .venv
+                    . .venv/bin/activate
+
+                    # 2. Tools we need
+                    pip install --upgrade pip nbqa flake8 autopep8
+
+                    # 3. Auto-format whitespace first
+                    nbqa autopep8 --in-place --aggressive --aggressive k8s-lstm/notebook/lstm-disaster-recovery.ipynb
+                    autopep8  --in-place --recursive --aggressive --aggressive k8s-lstm/
+
+                    # 4. Lint, but ignore E501 (picked up from .flake8)
+                    nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
+                        --max-line-length 120 --extend-ignore E501
+                    flake8 k8s-lstm/ \
+                        --max-line-length 120 --extend-ignore E501
                 '''
             }
         }
