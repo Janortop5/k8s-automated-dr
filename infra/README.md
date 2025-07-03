@@ -19,6 +19,7 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
    * **Kubernetes** Client plugin (*enables jenkins remote actions on kubernetes cluster*)
    * **Kubernetes** Credentials plugin (*add credentials to jenkins and enable remote actions*)
    * **GitHub** plugin (*adds web-hooks endpoint & creds helpers*)
+   * **Docker pipeline** plugin (*adds docker agent to pipeline*)
    * **Git** plugin (already bundled in most installs)
    * **Pipeline** (if you want to use a `Jenkinsfile`, highly recommended)
 

@@ -37,15 +37,9 @@
   pip:
     name: docker
 
-- name: Pull default Docker image
-  community.docker.docker_image:
-    name: "{{ default_container_image }}"
-    source: pull
-
-- name: Create default containers
-  community.docker.docker_container:
-    name: "{{ default_container_name }}{{ item }}"
-    image: "{{ default_container_image }}"
-    command: "{{ default_container_command }}"
-    state: present
-  with_sequence: count={{ container_count }}
+- name: Ensure jenkins user is in the docker group
+  user:
+    name: jenkins          # replace if your agent runs as a different account
+    groups: docker
+    append: yes
+  notify: restart jenkins

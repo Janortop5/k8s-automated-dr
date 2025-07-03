@@ -1,32 +1,37 @@
 pipeline {
-    /* ---------------- GLOBAL AGENT ---------------- */
-    agent {
-        docker {
-            // <-- the fix is right here
-            image "docker:24.0.7-dind"
-            args  '--privileged'
-        }
-    }
+    /* -------------------------------------------------------------- *
+     *  GLOBAL SETTINGS                                               *
+     * -------------------------------------------------------------- */
+    agent any                     // just give me any node that has Docker
+    options { timestamps() }      // show HH:mm:ss on every log line
 
-    /* -------------- ENVIRONMENT VARS -------------- */
     environment {
-        IMAGE_NAME     = 'lstm-model'
-        IMAGE_TAG      = 'latest'
-        REPOSITORY     = 'janortop5'
-        FULL_IMAGE     = "${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
+        IMAGE_NAME  = 'lstm-model'
+        IMAGE_TAG   = 'latest'
+        REPOSITORY  = 'janortop5'
+        FULL_IMAGE  = "${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
         DOCKER_CREDENTIALS     = credentials('dockerhub-pat')
         KUBECONFIG_CREDENTIALS = credentials('kubeconfig-prod')
     }
 
+    /* -------------------------------------------------------------- *
+     *  STAGES                                                        *
+     * -------------------------------------------------------------- */
     stages {
+
+        /* 1. Checkout once, on the host                           */
         stage('Checkout') {
             steps { checkout scm }
         }
 
+        /* 2. Lint inside a Python container                       */
         stage('Lint') {
-            /* run linting inside a Python container */
-            agent { docker { image 'python:3.11' } }
+            agent {
+                docker { image 'python:3.11' }
+            }
+            /* We already checked out the repo, so skip Jenkins’ auto-checkout */
+            options { skipDefaultCheckout true }
             steps {
                 sh '''
                     pip install --upgrade pip nbqa flake8
@@ -36,7 +41,12 @@ pipeline {
             }
         }
 
+        /* 3. Build & push the image (needs DinD)                   */
         stage('Build') {
+            agent {
+                docker { image 'docker:24.0.7-dind'; args '--privileged' }
+            }
+            options { skipDefaultCheckout true }
             steps {
                 withCredentials([usernamePassword(
                         credentialsId: 'dockerhub-pat',
@@ -56,6 +66,7 @@ pipeline {
             }
         }
 
+        /* 4. Deploy with kubectl container                         */
         stage('Deploy') {
             agent {
                 docker {
@@ -64,6 +75,7 @@ pipeline {
                           '-v /etc/localtime:/etc/localtime:ro'
                 }
             }
+            options { skipDefaultCheckout true }
             steps {
                 withCredentials([file(
                         credentialsId: 'kubeconfig-prod',
@@ -83,7 +95,9 @@ pipeline {
         }
     }
 
-    /* -------------- PIPELINE-LEVEL POST ------------ */
+    /* -------------------------------------------------------------- *
+     *  PIPELINE-LEVEL POST                                           *
+     * -------------------------------------------------------------- */
     post {
         always  { cleanWs() }
         success { echo "✅ Pipeline completed successfully. Image: ${FULL_IMAGE}" }

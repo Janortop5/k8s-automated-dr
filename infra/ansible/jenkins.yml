@@ -15,6 +15,11 @@
     import_tasks: tasks/install_extra_jenkins_settings.yml
     tags: jenkins
     when: "'jenkins-server' in group_names"
+  
+  - name: Install Docker
+    import_tasks: tasks/install_docker.yml
+    tags: docker
+    when: "'jenkins-server' in group_names"
 
   handlers:
     - name: restart jenkins
