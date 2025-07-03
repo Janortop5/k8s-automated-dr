@@ -1,7 +1,13 @@
 pipeline {
+<<<<<<< HEAD
     /* -------------------------------------------------------------- *
      *  GLOBAL SETTINGS                                               *
      * -------------------------------------------------------------- */
+=======
+  agent { 
+    docker { image 'python:3.13.5-alpine3.22' } 
+    }
+>>>>>>> 22a7c99 (update with python agent)
 
 
     agent any                     // just give me any node that has Docker
