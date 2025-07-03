@@ -293,10 +293,9 @@ class PrometheusMetricsCollector:
                     time_series_data.append(metrics_point)
 
             logger.info(
-                f"Collected {
-                    len(time_series_data)} time series points")
+                f"Collected {len(time_series_data)} time series points")
             return time_series_data
-
+    
         except Exception as e:
             logger.error(f"Error collecting time series metrics: {e}")
             return None

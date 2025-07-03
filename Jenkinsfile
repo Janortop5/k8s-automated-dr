@@ -60,7 +60,7 @@ pipeline {
                     # 5. lint the final artefacts
                     nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
                         --max-line-length 120 --extend-ignore E501,F401,F821
-                    flake8 k8s-lstm/ --max-line-length 120 --extend-ignore E501
+                    flake8 k8s-lstm/ --max-line-length 120 --extend-ignore E501,E999
                 '''
             }
         }

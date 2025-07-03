@@ -156,8 +156,7 @@ async def predict(request: PredictionRequest):
         logger.error(f"Error during prediction: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Prediction error: {
-                str(e)}")
+            detail=f"Prediction error: {str(e)}")
 
 
 @app.get("/model/info")
