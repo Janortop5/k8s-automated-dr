@@ -111,25 +111,29 @@ exactly what the Kubernetes API expects.
 
 * Upload the file to Jenkins once: Manage Jenkins → Manage Credentials → (Global) → Add Credentials
 
-   Kind: Kubernetes configuration (kubeconfig)
-   File: select the jenkins-kubeconfig.yaml you just generated
-   Give it an ID such as k8s-jenkins-agent.
+   * Kind: Kubernetes configuration (kubeconfig)
+   * File: select the jenkins-kubeconfig.yaml you just generated
+   * Give it an ID such as k8s-jenkins-agent.
 
 * Tell the Kubernetes Cloud to use it: Manage Jenkins → Manage Nodes and Clouds → Configure Clouds → Kubernetes
 
-   Field	What to enter. 
-   Kubernetes URL	https://<master-PRIVATE-IP>:6443.
-   Kubernetes server certificate key -> copy value of `certificate-authority-data`.
-   Credentials	choose k8s-jenkins-agent.
-   Kubernetes Namespace	default -> 
-   TLS / Certificate	Leave blank – the CA in the kube-config is enough
-
+* Field	What to enter. 
+   * Kubernetes URL	https://**master-PRIVATE-IP**:6443.
+   * Kubernetes server certificate key -> leave empty`.
+   * Kubernetes Namespace -> jenkins
+   * Agent Docker Registry -> docker.io
+   * Credentials	choose k8s-jenkins-agent.
+   * WebSocket ? Direct Connection -> Select WebSocket
+   * Jenkins url -> jenkins https url (copy from ansible output)
+   * Transfer proxy related environment variables form controller to agent -> leave off
+   * Restrict pipeline support to authorized folder -> leave off
+   * Defaults provider Template? -> Leave Blank
+   * Enable garbage collection -> leave off
 * Save. The plugin loads the kube-config, extracts the token & CA, and starts using the API immediately.
 
-   Nothing else to copy – the token Jenkins needs is already inside the file.
-   Whenever the playbook refreshes the token (e.g. re-run in 24 h) just upload
-   the new kube-config or replace the credential file; Jenkins picks it up
-   without a restart.
+   * Nothing else to copy – the token Jenkins needs is already inside the file.
+   * Whenever the playbook refreshes the token (e.g. re-run in 24 h) just upload
+   * the new kube-config or replace the credential file; Jenkins picks it up without a restart.
 
 
 ## 4  Create the job
@@ -179,16 +183,11 @@ GitHub will ping the endpoint; you should see “*Payload delivered*” and a 20
 
 | Quick check                     | Why                                                                                                          |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **HTTPS** instead of plain HTTP | Your PAT travels in the webhook header. A self-signed cert or Let’s Encrypt via Nginx reverse-proxy is fine. |
 | **Controller executors = 0**    | Even for a hobby box, it helps avoid “works on my machine” surprises when you later add agents.              |
 | **Backup your `JENKINS_HOME`**  | At least tarball it once in a while.                                                                         |
-
 
 
 ### That’s it!
 
 Push a commit → GitHub fires a webhook → Jenkins job appears or rebuilds in the UI. If anything doesn’t trigger:
-
-* Check **GitHub → Webhooks → Recent Deliveries** for non-200 codes.
-* In Jenkins, **Manage Jenkins → System Log → `com.cloudbees.jenkins.GitHubWebHook`** for incoming hook traces.
 
