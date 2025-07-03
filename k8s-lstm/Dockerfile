@@ -12,7 +12,9 @@ COPY notebook/* .
 # Install pip-tools, compile, then install
 RUN pip install --upgrade pip setuptools wheel pip-tools && \
     pip-compile requirements.in --output-file=requirements.txt && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir jupyter nbconvert ipykernel
+
 
 # 3. Execute the notebook head-less; ModelManager will write to ./models/
 RUN jupyter nbconvert \
