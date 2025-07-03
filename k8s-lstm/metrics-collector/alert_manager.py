@@ -1,9 +1,8 @@
 import logging
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict
 import requests
-from datetime import datetime, timedelta
-import json
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(

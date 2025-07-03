@@ -67,7 +67,7 @@ class PrometheusMetricsCollector:
             '''
         }
 
-        logger.info(f"Initialized PrometheusMetricsCollector:")
+        logger.info("Initialized PrometheusMetricsCollector:")
         logger.info(f"  Prometheus URL: {self.prometheus_url}")
         logger.info(f"  Model endpoint: {self.model_endpoint}")
         logger.info(f"  Collection interval: {self.collection_interval}s")

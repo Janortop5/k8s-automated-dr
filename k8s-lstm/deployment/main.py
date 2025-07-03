@@ -6,7 +6,7 @@ from tensorflow import keras
 import logging
 import os
 import pickle
-from typing import List, Union
+from typing import List
 import uvicorn
 
 # Configure logging
