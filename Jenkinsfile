@@ -1,10 +1,18 @@
 pipeline {
-  agent any
+    agent {
+        docker {
+            image 'docker:24.0.7-dind' 
+            args '--privileged'
+        }
+    }
 
   environment {
-    IMAGE_NAME    = "lstm-disaster-recovery"
+    IMAGE_NAME    = "lstm-model"
     IMAGE_TAG     = "latest"
-    FULL_IMAGE    = "${env.REGISTRY}/${env.IMAGE_NAME}:${IMAGE_TAG}"
+    REPOSITORY    = "janortop'
+    FULL_IMAGE    = "${env.REPOSITORY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+    DOCKER_CREDENTIALS = credentials('dockerhub-pat')
+    KUBECONFIG_CREDENTIALS = credentials('kubeconfig-prod')
   }
 
   stages {
@@ -13,39 +21,63 @@ pipeline {
         checkout scm
       }
     }
-
     stage('Lint') {
+      agent {
+          docker {
+              image 'python:3.11'
+          }
+      }
       steps {
         // Install nbQA for linting notebooks, and flake8
         sh '''
           pip install --upgrade pip
           pip install nbqa flake8
-          # Run flake8 over the notebook
-          nbqa flake8 lstm-disaster-recovery.ipynb --max-line-length=88
+          
+          # Lint notebook
+          nbqa flake8 lstm-disaster-recovery.ipynb 
+
+          # Lint Python application code
+          flake8 k8s-lstm/
         '''
       }
     }
 
-    stage('Build Docker Image') {
+    stage('Build') {
       steps {
-        script {
-          // Build the Docker image
-          dockerImage = docker.build(FULL_IMAGE)
-        }
+        sh '''
+          # change to working directory
+          cd k8s-lstm
+          
+          # docker user login
+          echo "$DOCKER_CREDENTIALS_PSW" | docker login -u "$DOCKER_CREDENTIALS_USR" --password-stdin
+          
+          # build the docker image
+          docker build -t $FULL_IMAGE .
+
+          # push the docker image
+          docker push $FULL_IMAGE
+        '''
       }
     }
 
-    stage('Push to Registry') {
+    stage('Deploy') {
+      agent {
+        docker {
+          image 'bitnami/kubectl:latest' 
+          args '-v /etc/timezone:/etc/timezone:ro -v /etc/localtime:/etc/localtime:ro' // Optional: timezone sync
+        }
+      }
       steps {
-        script {
-          // Log in and push
-          docker.withRegistry("https://${env.REGISTRY}", env.REGISTRY_PASSWORD) {
-            dockerImage.push(IMAGE_TAG)
-          }
+        withCredentials([file(credentialsId: 'kubeconfig-prod', variable: 'KUBECONFIG')]) {
+          sh '''
+            echo "🔧 Applying Kubernetes manifests..."
+            kubectl version --short
+            kubectl config view
+            kubectl apply -f k8s-manifests/
+          '''
         }
       }
     }
-  }
 
   post {
     always {
@@ -53,9 +85,10 @@ pipeline {
     }
     success {
       echo "✅ Image pushed: ${FULL_IMAGE}"
+      echo "K8s manifests applied."
     }
     failure {
-      echo "❌ Build or push failed"
+      echo "❌ Build or deploy failed"
     }
   }
 }

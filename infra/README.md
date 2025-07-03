@@ -15,7 +15,9 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
 1. **Manage Jenkins → Manage Plugins → Available**
 2. Search and install (no restart required for recent LTS versions):
 
-   * **Kubernetes** plugin (*add credentials to jenkins and enable remote actions*)
+   * **Kubernetes** plugin (*add jenkins agents to kubernetes cluster*)
+   * **Kubernetes** Client plugin (*enables jenkins remote actions on kubernetes cluster*)
+   * **Kubernetes** Credentials plugin (*add credentials to jenkins and enable remote actions*)
    * **GitHub** plugin (*adds web-hooks endpoint & creds helpers*)
    * **Git** plugin (already bundled in most installs)
    * **Pipeline** (if you want to use a `Jenkinsfile`, highly recommended)
@@ -69,13 +71,13 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
 1. Go to Manage Jenkins → Clouds → New Cloud
 2. Add a new Kubernetes cloud:
 
-   *Cloud name -> k8s-automated-dr
+   * Cloud name -> `k8s-automated-dr`
    * Type -> kubernetes
-3. Fill in:
+3. Actions Needed:
 
-   * Kubernetes URL <--- Find in kubeconfig generated in ansible directory
+   * Kubernetes URL                       <- Find this in generated kubeconfig in ansible directory
    * Attach your credentials
-   * Customize pod template if needed
+   * Customize pod template if needed     <- Configuartion still valid if NOT set.
    * Test the connection
 
 
@@ -109,11 +111,7 @@ clusters:
 The CA bundle is already Base-64, but the token is plain text – that’s
 exactly what the Kubernetes API expects.
 
-* Upload the file to Jenkins once: Manage Jenkins → Manage Credentials → (Global) → Add Credentials
-
-   * Kind: Kubernetes configuration (kubeconfig)
-   * File: select the jenkins-kubeconfig.yaml you just generated
-   * Give it an ID such as k8s-jenkins-agent.
+* Upload the file to Jenkins once: Manage Jenkins → Manage Credentials → (Global) → Add Credentials (Check steps above)
 
 * Tell the Kubernetes Cloud to use it: Manage Jenkins → Manage Nodes and Clouds → Configure Clouds → Kubernetes
 
@@ -146,12 +144,11 @@ exactly what the Kubernetes API expects.
 
    * **Add source → GitHub**
    * Credentials: choose your `github-pat`
-   * Owner / Repository: enter `<your-GH-user>/<repo>`
-4. 👇 Expand **Build Triggers** and tick **“Scan by webhook”**.
-   Jenkins shows you its webhook endpoint:
-   `https://<jenkins-host>/github-webhook/`
+   * Repository https: enter `<repo https clone url>`
+4. 👇 Mode **by Jenkinsfile** and **script-file: Jenkinsfile**.
+5. * Apply and Save
 
-Click **Save** → Jenkins will scan the repo immediately, build any branch with a `Jenkinsfile`, and keep polling via the webhook.
+After **Save** → Jenkins will scan the repo immediately, build any branch with a `Jenkinsfile`, and keep polling via the webhook.
 
 ### Lite alternative: *Freestyle* or *Single Pipeline* job
 
