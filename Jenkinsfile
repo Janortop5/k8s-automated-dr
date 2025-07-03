@@ -33,6 +33,7 @@ pipeline {
         stage('Lint') {
             agent {
                 docker { image 'python:3.11-bullseye' }   // or simply 'python:3.11-bullseye'
+                args  '-u 0:0'          // ← run as root:root inside the container
             }
             options { skipDefaultCheckout true }
             steps {
@@ -47,7 +48,7 @@ pipeline {
         /* 3. Build & push the image (needs DinD)                   */
         stage('Build') {
             agent {
-                docker { image 'docker:24.0.7-dind'; args '--privileged' }
+                docker { image 'docker:24.0.7-dind'; args '--privileged -u 0:0' }
             }
             options { skipDefaultCheckout true }
             steps {
@@ -75,7 +76,8 @@ pipeline {
                 docker {
                     image 'bitnami/kubectl:latest'
                     args  '-v /etc/timezone:/etc/timezone:ro ' +
-                          '-v /etc/localtime:/etc/localtime:ro'
+                          '-v /etc/localtime:/etc/localtime:ro' +
+                          '-u 0:0' // run as root:root inside the container
                 }
             }
             options { skipDefaultCheckout true }
