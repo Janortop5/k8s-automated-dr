@@ -9,8 +9,10 @@ WORKDIR /app
 COPY notebook/* .
 
 # 2. Install the full training stack
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir jupyter nbconvert
+# Install pip-tools, compile, then install
+RUN pip install --upgrade pip setuptools wheel pip-tools && \
+    pip-compile requirements.in --output-file=requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt
 
 # 3. Execute the notebook head-less; ModelManager will write to ./models/
 RUN jupyter nbconvert \
