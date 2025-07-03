@@ -184,6 +184,14 @@ GitHub will ping the endpoint; you should see “*Payload delivered*” and a 20
 | **Controller executors = 0**    | Even for a hobby box, it helps avoid “works on my machine” surprises when you later add agents.              |
 | **Backup your `JENKINS_HOME`**  | At least tarball it once in a while.                                                                         |
 
+## Reclaim Space on Jenkins Server
+
+```bash
+sudo su -
+root@ip-10-0-2-239:~# #!/bin/bash
+docker system prune -af --volumes
+rm -rf /var/lib/jenkins/workspace/* /var/lib/jenkins/tmp/*
+```
 
 ### That’s it!
 
