@@ -32,8 +32,8 @@ pipeline {
         /* 2. Lint inside a Python container                       */
         stage('Lint') {
             agent {
-                docker { image 'python:3.11-bullseye' }   // or simply 'python:3.11-bullseye'
-                args  '-u 0:0'          // ← run as root:root inside the container
+                docker { image 'python:3.11-bullseye'; args  '-u 0:0' }   // ← run as root:root inside the container
+                         
             }
             options { skipDefaultCheckout true }
             steps {
