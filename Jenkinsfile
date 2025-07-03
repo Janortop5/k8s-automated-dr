@@ -9,7 +9,7 @@ pipeline {
   environment {
     IMAGE_NAME    = "lstm-model"
     IMAGE_TAG     = "latest"
-    REPOSITORY    = "janortop'
+    REPOSITORY    = "janortop5"
     FULL_IMAGE    = "${env.REPOSITORY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
     DOCKER_CREDENTIALS = credentials('dockerhub-pat')
     KUBECONFIG_CREDENTIALS = credentials('kubeconfig-prod')
