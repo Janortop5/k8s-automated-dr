@@ -3,14 +3,13 @@ pipeline {
     agent {
         docker {
             // <-- the fix is right here
-            image "docker:${env.DOCKER_VERSION}-dind"
+            image "docker:24.0.7-dind"
             args  '--privileged'
         }
     }
 
     /* -------------- ENVIRONMENT VARS -------------- */
     environment {
-        DOCKER_VERSION = '24.0.7'
         IMAGE_NAME     = 'lstm-model'
         IMAGE_TAG      = 'latest'
         REPOSITORY     = 'janortop5'
