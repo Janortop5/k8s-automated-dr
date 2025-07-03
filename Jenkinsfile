@@ -43,17 +43,21 @@ pipeline {
                     . .venv/bin/activate
 
                     # 2. Tools we need
-                    pip install --upgrade pip nbqa flake8 autopep8
+                    pip install --upgrade pip nbqa flake8 autopep8 nbstripout
 
                     # 3. Auto-format whitespace first
                     nbqa autopep8 --in-place --aggressive --aggressive k8s-lstm/notebook/lstm-disaster-recovery.ipynb
                     autopep8  --in-place --recursive --aggressive --aggressive k8s-lstm/
 
-                    # 4. Lint, but ignore E501 (picked up from .flake8)
+                    # 4. strip notebook outputs **in-place**
+                    nbstripout --in-place k8s-lstm/notebook/lstm-disaster-recovery.ipynb
+                    #   or, for every notebook:
+                    #   find k8s-lstm -name '*.ipynb' -exec nbstripout --in-place {} +
+
+                    # 5. lint the final artefacts
                     nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
                         --max-line-length 120 --extend-ignore E501
-                    flake8 k8s-lstm/ \
-                        --max-line-length 120 --extend-ignore E501
+                    flake8 k8s-lstm/ --max-line-length 120 --extend-ignore E501
                 '''
             }
         }
