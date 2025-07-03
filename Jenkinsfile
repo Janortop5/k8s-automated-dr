@@ -2,8 +2,13 @@ pipeline {
     /* -------------------------------------------------------------- *
      *  GLOBAL SETTINGS                                               *
      * -------------------------------------------------------------- */
+
+
     agent any                     // just give me any node that has Docker
-    options { timestamps() }      // show HH:mm:ss on every log line
+    options {
+        timestamps()
+        dockerFingerprintFrom 'true'     // records exactly which image sha was run
+    }
 
     environment {
         IMAGE_NAME  = 'lstm-model'
@@ -28,9 +33,8 @@ pipeline {
         /* 2. Lint inside a Python container                       */
         stage('Lint') {
             agent {
-                docker { image 'python:3.11' }
+                docker { image 'python:3.11-bullseye' }   // or simply 'python:3.11-bullseye'
             }
-            /* We already checked out the repo, so skip Jenkins’ auto-checkout */
             options { skipDefaultCheckout true }
             steps {
                 sh '''
