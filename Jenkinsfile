@@ -39,7 +39,6 @@ pipeline {
                 docker { image 'python:3.11-bullseye'; args  '-u 0:0' }   // ← run as root:root inside the container
                          
             }
-            options { skipDefaultCheckout true }
             steps {
                 sh '''
                     # 1. Lightweight virtual environment (lives in workspace, removed by cleanWs())
@@ -72,7 +71,6 @@ pipeline {
             agent {
                 docker { image 'docker:24.0.7-dind'; args '--privileged -u 0:0' }
             }
-            options { skipDefaultCheckout true }
             steps {
                 withCredentials([usernamePassword(
                         credentialsId: 'dockerhub-pat',
@@ -102,7 +100,6 @@ pipeline {
                           '-u 0:0' // run as root:root inside the container
                 }
             }
-            options { skipDefaultCheckout true }
             steps {
                 withCredentials([file(
                         credentialsId: 'kubeconfig-prod',
