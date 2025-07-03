@@ -17,7 +17,8 @@ RUN jupyter nbconvert \
       --to notebook \
       --execute ./lstm-disaster-recovery.ipynb \
       --output executed.ipynb \
-      --ExecutePreprocessor.timeout=1800
+      --ExecutePreprocessor.timeout=1800 \
+      --ExecutePreprocessor.kernel_name=python3
 
 ############################################################
 # -------- Stage 2 : Build App ------------- #
