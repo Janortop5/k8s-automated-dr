@@ -39,7 +39,7 @@ pipeline {
             steps {
                 sh '''
                     pip install --upgrade pip nbqa flake8
-                    nbqa flake8 lstm-disaster-recovery.ipynb
+                    nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb
                     flake8 k8s-lstm/
                 '''
             }
