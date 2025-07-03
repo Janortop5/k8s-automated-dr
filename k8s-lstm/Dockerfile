@@ -6,7 +6,7 @@ FROM python:3.11-slim AS trainer
 WORKDIR /app
 
 # 1. Copy the notebook and any helper modules it imports
-COPY notebook/* .
+COPY notebook/ .
 
 # 2. Install the full training stack
 # Install pip-tools, compile, then install
