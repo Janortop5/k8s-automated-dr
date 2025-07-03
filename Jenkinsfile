@@ -68,7 +68,7 @@ pipeline {
         /* 3. Build & push the image (needs DinD)                   */
         stage('Build') {
             agent {
-                docker { image 'docker:24.0.7-dind'; args '--privileged -u 0:0' }
+                docker { image 'docker:24.0.7'; args  '-v /var/run/docker.sock:/var/run/docker.sock -u 0:0' }
             }
             steps {
                 withCredentials([usernamePassword(
