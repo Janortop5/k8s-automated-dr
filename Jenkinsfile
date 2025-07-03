@@ -25,8 +25,12 @@ pipeline {
     stages {
 
         /* 1. Checkout once, on the host                           */
-        stage('Checkout') {
-            steps { checkout scm }
+        stage('Prepare') {
+          steps {
+            cleanWs()      // kill stale workspace
+            checkout scm   // fresh code
+            sh 'pip install -r requirements.txt'
+          }
         }
 
         /* 2. Lint inside a Python container                       */

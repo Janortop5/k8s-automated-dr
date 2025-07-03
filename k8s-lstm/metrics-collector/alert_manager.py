@@ -12,32 +12,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 class AlertManager:
     def __init__(self):
         # Alert thresholds (can be configured via env vars)
-        self.cpu_threshold = float(os.getenv('ALERT_CPU_THRESHOLD', '30.0'))  # CPU usage %
-        self.memory_threshold = float(os.getenv('ALERT_MEMORY_THRESHOLD', '30.0'))  # Memory usage %
-        
+        self.cpu_threshold = float(
+            os.getenv(
+                'ALERT_CPU_THRESHOLD',
+                '30.0'))  # CPU usage %
+        self.memory_threshold = float(
+            os.getenv(
+                'ALERT_MEMORY_THRESHOLD',
+                '30.0'))  # Memory usage %
+
         # Alert configuration
         self.slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
         self.teams_webhook = os.getenv('TEAMS_WEBHOOK_URL')
-        self.alert_cooldown = int(os.getenv('ALERT_COOLDOWN_SECONDS', '300'))  # 5 minutes
-        
+        self.alert_cooldown = int(
+            os.getenv(
+                'ALERT_COOLDOWN_SECONDS',
+                '300'))  # 5 minutes
+
         # Track last alert times to prevent alert flooding
         self.last_alert_times: Dict[str, datetime] = {}
-        
+
     def _is_cooldown_active(self, metric_name: str) -> bool:
         """Check if the cooldown period is still active for a specific metric"""
         if metric_name not in self.last_alert_times:
             return False
-            
-        time_since_last_alert = datetime.now() - self.last_alert_times[metric_name]
+
+        time_since_last_alert = datetime.now(
+        ) - self.last_alert_times[metric_name]
         return time_since_last_alert.total_seconds() < self.alert_cooldown
-    
+
     def _update_last_alert_time(self, metric_name: str):
         """Update the last alert time for a specific metric"""
         self.last_alert_times[metric_name] = datetime.now()
-        
+
     def check_prediction(self, predictions: dict) -> List[Dict]:
         """
         Check predictions against thresholds and generate alerts if needed
@@ -49,8 +60,10 @@ class AlertManager:
         memory_predictions = predictions['mem_usage']
         cpu_predictions = predictions['cpu_usage']
 
-        mem_exceeds = [val for val in memory_predictions if val > self.memory_threshold]
-        cpu_exceeds = [val for val in cpu_predictions if val > self.cpu_threshold]
+        mem_exceeds = [
+            val for val in memory_predictions if val > self.memory_threshold]
+        cpu_exceeds = [
+            val for val in cpu_predictions if val > self.cpu_threshold]
 
         # Check memory usage with cooldown
         if mem_exceeds and not self._is_cooldown_active('memory'):
@@ -69,8 +82,8 @@ class AlertManager:
             time_since_last = datetime.now() - self.last_alert_times['memory']
             remaining_seconds = self.alert_cooldown - time_since_last.total_seconds()
             logger.info(f"Memory threshold exceeded but alert suppressed due to cooldown. "
-                       f"Remaining cooldown: {remaining_seconds:.0f} seconds")
-        
+                        f"Remaining cooldown: {remaining_seconds:.0f} seconds")
+
         # Check CPU usage with cooldown
         if cpu_exceeds and not self._is_cooldown_active('cpu'):
             alert = {
@@ -88,14 +101,14 @@ class AlertManager:
             time_since_last = datetime.now() - self.last_alert_times['cpu']
             remaining_seconds = self.alert_cooldown - time_since_last.total_seconds()
             logger.info(f"CPU threshold exceeded but alert suppressed due to cooldown. "
-                       f"Remaining cooldown: {remaining_seconds:.0f} seconds")
-        
+                        f"Remaining cooldown: {remaining_seconds:.0f} seconds")
+
         if alerts:
             logger.warning(f"Sending alerts: {alerts}")
             self._send_alert(alerts)
-        
+
         return alerts
-    
+
     def _send_alert(self, alerts: List[Dict]) -> bool:
         """Send combined alert to configured notification channels"""
         success = False
@@ -125,10 +138,12 @@ class AlertManager:
                     logger.info("Alert sent to Slack successfully")
                     success = True
                 else:
-                    logger.error(f"Failed to send Slack alert: {response.status_code}")
+                    logger.error(
+                        f"Failed to send Slack alert: {
+                            response.status_code}")
             except Exception as e:
                 logger.error(f"Error sending Slack alert: {e}")
-        
+
         # Try Microsoft Teams
         if self.teams_webhook:
             try:
@@ -140,7 +155,7 @@ class AlertManager:
                     'title': 'Resource Usage Alert',
                     'text': message
                 }
-                
+
                 response = requests.post(
                     self.teams_webhook,
                     json=teams_message,
@@ -150,26 +165,28 @@ class AlertManager:
                     logger.info("Alert sent to Teams successfully")
                     success = True
                 else:
-                    logger.error(f"Failed to send Teams alert: {response.status_code}")
+                    logger.error(
+                        f"Failed to send Teams alert: {
+                            response.status_code}")
             except Exception as e:
                 logger.error(f"Error sending Teams alert: {e}")
-        
+
         return success
-    
+
     def get_cooldown_status(self) -> Dict[str, Dict]:
         """Get current cooldown status for all metrics - useful for debugging"""
         status = {}
         current_time = datetime.now()
-        
+
         for metric, last_alert_time in self.last_alert_times.items():
             time_since_last = current_time - last_alert_time
-            remaining_seconds = max(0, self.alert_cooldown - time_since_last.total_seconds())
-            
+            remaining_seconds = max(
+                0, self.alert_cooldown - time_since_last.total_seconds())
+
             status[metric] = {
                 'last_alert_time': last_alert_time.isoformat(),
                 'time_since_last_alert_seconds': time_since_last.total_seconds(),
                 'cooldown_active': remaining_seconds > 0,
-                'remaining_cooldown_seconds': remaining_seconds
-            }
-        
+                'remaining_cooldown_seconds': remaining_seconds}
+
         return status
