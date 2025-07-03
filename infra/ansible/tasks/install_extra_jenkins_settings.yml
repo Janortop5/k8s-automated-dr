@@ -1,101 +1,26 @@
-- name: Read initial admin password from Jenkins filesystem
-  slurp:
-    src: /var/lib/jenkins/secrets/initialAdminPassword
-  register: initial_pw
-  become: true
-  run_once: true
-
-- name: Set Jenkins admin password fact   # get the initial admin password from ansible debug message during plabybook run
-  set_fact:
-    jenkins_admin_password: "{{ initial_pw.content | b64decode | trim }}"
-
-- name: Wait for Jenkins to be up and responding
-  uri:
-    url: "http://localhost:8080/login"
-    status_code: 200
-  register: jstat
-  until: jstat.status == 200
-  retries: 10
-  delay: 15
-  become: false
-
-- name: Install OpenID Connect plugin
-  community.general.jenkins_plugin:
-    name: openid-connect
-    state: latest
-    url: "http://localhost:8080"
-    url_username: "admin"
-    url_password: "{{ jenkins_admin_password }}"
-    with_dependencies: true
-  become: true
-  notify: restart jenkins
-
-# Install “Role Strategy” plugin (for mapping groups to permissions)
-- name: Ensure Role Strategy plugin is installed (for role-based auth)
-  community.general.jenkins_plugin:
-    name: role-strategy
-    state: latest
-    url: "http://localhost:8080"
-    url_username: "admin"
-    url_password: "{{ jenkins_admin_password }}"
-  become: true
-  notify: restart jenkins
-
-- name: Ensure init.groovy.d directory exists
-  file:
-    path: /var/lib/jenkins/init.groovy.d
-    state: directory
-    owner: jenkins
-    group: jenkins
-    mode: '0755'
-
-- name: Copy OIDC init script into Jenkins
-  copy:
-    src: jenkins/oidc-init.groovy
-    dest: /var/lib/jenkins/init.groovy.d/01-oidc.groovy
-    owner: jenkins
-    group: jenkins
-    mode: '0644'
-  notify: restart jenkins
-
-- name: Configure Jenkins to bind on localhost only
-  lineinfile:
-    path: /etc/default/jenkins
-    regexp: '^HTTP_HOST='
-    line: 'HTTP_HOST=127.0.0.1'
-    state: present
-  notify: restart jenkins
-
-- name: Install Nginx
-  apt:
-    name: nginx
+# ---------------------------------------------------------------------------
+# 0.  Packages: Nginx + Certbot
+# ---------------------------------------------------------------------------
+- name: Ensure Nginx and Certbot packages are present
+  ansible.builtin.apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
     state: present
     update_cache: yes
 
-- name: Create Nginx site for Jenkins (HTTP → HTTPS redirect)
-  copy:
-    dest: /etc/nginx/sites-available/jenkins-http.conf
-    content: |
-      server {
-          listen 80;
-          server_name {{ jenkins_domain }};
-
-          # Do not serve any files—just redirect everything to HTTPS
-          return 301 https://$host$request_uri;
-      }
-  notify: reload nginx
-
-- name: Create Jenkins temporary HTTP-only Nginx site
-  copy:
+# ---------------------------------------------------------------------------
+# 1.  Temporary HTTP-only proxy (for ACME HTTP-01 challenge)
+# ---------------------------------------------------------------------------
+- name: Install temporary HTTP-only vhost
+  ansible.builtin.copy:
     dest: /etc/nginx/sites-available/jenkins-temp.conf
-    owner: root
-    group: root
-    mode: '0644'
+    mode: "0644"
     content: |
       server {
-          listen 80 default_server;        
-          server_name _;                  
-
+          listen 80 default_server;
+          server_name _;
           location / {
               proxy_pass          http://127.0.0.1:8080;
               proxy_set_header    Host              $host;
@@ -107,56 +32,90 @@
       }
   notify: reload nginx
 
-- name: Enable Jenkins temporary HTTP-only site
-  file:
-    src: "/etc/nginx/sites-available/jenkins-temp.conf"
-    dest: "/etc/nginx/sites-enabled/jenkins-temp.conf"
+- name: Enable temporary vhost & remove distro default
+  ansible.builtin.file:
+    src:  /etc/nginx/sites-available/jenkins-temp.conf
+    dest: /etc/nginx/sites-enabled/jenkins-temp.conf
     state: link
   notify: reload nginx
 
-- name: Disable default Nginx site (if present)
-  file:
+- name: Ensure default “welcome” vhost is absent
+  ansible.builtin.file:
     path: /etc/nginx/sites-enabled/default
     state: absent
   notify: reload nginx
 
-- name: Install Certbot + Nginx plugin
-  apt:
-    name:
-      - certbot
-      - python3-certbot-nginx
-    state: present
-    update_cache: yes
+# ---------------------------------------------------------------------------
+# 2.  Try every public suffix until Certbot succeeds
+# ---------------------------------------------------------------------------
+- name: Initialise success flag
+  set_fact:
+    cert_obtained: false
+    jenkins_live_domain: ""
 
-- name: Obtain or renew Let's Encrypt certificate for Jenkins
-  command: >
-    certbot --nginx
-            --non-interactive
-            --agree-tos
-            --email {{ letsencrypt_email }}
-            --redirect
-            -d {{ jenkins_domain }}
+- name: Run Certbot for each candidate domain
+  shell: |
+    DOMAIN="jenkins.{{ jenkins_public_ip }}.{{ item }}"
+    if [ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+      certbot --nginx --non-interactive --agree-tos \
+              --email {{ letsencrypt_email }} \
+              --redirect \
+              -d "${DOMAIN}"
+    fi
   args:
-    creates: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
+    executable: /bin/bash            # makes the if-statement work
+  register: certbot_attempts          # collects *all* loop results
+  failed_when: false                  # don’t abort the play on errors
+  loop: "{{ public_suffixes }}"
+  loop_control:
+    label: "jenkins.{{ jenkins_public_ip }}.{{ item }}"
   notify: reload nginx
 
-- name: Create persistent HTTPS Nginx site for Jenkins
-  copy:
-    dest: /etc/nginx/sites-available/jenkins-ssl.conf
-    owner: root
-    group: root
+- name: Record winning domain (if any)
+  set_fact:
+    cert_obtained: true
+    jenkins_live_domain: "{{ item.item | ternary('jenkins.' ~ jenkins_public_ip ~ '.' ~ item.item, '') }}"
+  when: item.rc is defined and item.rc == 0
+  loop: "{{ certbot_attempts.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Abort when no certificate could be obtained
+  fail:
+    msg: |
+      Could not obtain a Let’s Encrypt certificate after trying:
+      {{ public_suffixes | map('regex_replace', '(.*)', 'jenkins.' ~ jenkins_public_ip ~ '.\\1') | join(', ') }}
+  when: not cert_obtained
+
+# ---------------------------------------------------------------------------
+# 3.  Permanent HTTP→HTTPS & HTTPS proxy vhosts
+# ---------------------------------------------------------------------------
+- name: Install permanent HTTP→HTTPS redirect vhost
+  ansible.builtin.copy:
+    dest: /etc/nginx/sites-available/jenkins-http.conf
     mode: "0644"
     content: |
-      # 443: SSL proxy to Jenkins
+      server {
+          listen 80;
+          server_name {{ jenkins_live_domain }};
+          return 301 https://$host$request_uri;
+      }
+  notify: reload nginx
+
+- name: Install permanent HTTPS proxy vhost
+  ansible.builtin.copy:
+    dest: /etc/nginx/sites-available/jenkins-ssl.conf
+    mode: "0644"
+    content: |
       server {
           listen 443 ssl http2;
-          server_name {{ jenkins_domain }};
+          server_name {{ jenkins_live_domain }};
 
-          ssl_certificate     /etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem;
-          ssl_certificate_key /etc/letsencrypt/live/{{ jenkins_domain }}/privkey.pem;
+          ssl_certificate     /etc/letsencrypt/live/{{ jenkins_live_domain }}/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/{{ jenkins_live_domain }}/privkey.pem;
 
-          ssl_session_cache   shared:SSL:10m;
           ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_session_cache   shared:SSL:10m;
           ssl_prefer_server_ciphers on;
 
           location / {
@@ -168,36 +127,107 @@
               proxy_buffering     off;
           }
       }
-
-      # 80: catch-all redirect to HTTPS (works for IP or any Host header)
-      server {
-          listen 80 default_server;
-          server_name _;
-
-          return 301 https://$host$request_uri;
-      }
   notify: reload nginx
 
-- name: Enable Jenkins HTTPS site
-  file:
-    src: /etc/nginx/sites-available/jenkins-ssl.conf
-    dest: /etc/nginx/sites-enabled/jenkins-ssl.conf
-    state: link
+- name: Enable permanent vhosts & remove temporary one
+  block:
+    - name: Enable HTTP redirect vhost
+      ansible.builtin.file:
+        src:  /etc/nginx/sites-available/jenkins-http.conf
+        dest: /etc/nginx/sites-enabled/jenkins-http.conf
+        state: link
+
+    - name: Enable HTTPS proxy vhost
+      ansible.builtin.file:
+        src:  /etc/nginx/sites-available/jenkins-ssl.conf
+        dest: /etc/nginx/sites-enabled/jenkins-ssl.conf
+        state: link
+
+    - name: Remove temporary vhost symlink
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/jenkins-temp.conf
+        state: absent
+
+    - name: Remove temporary vhost file
+      ansible.builtin.file:
+        path: /etc/nginx/sites-available/jenkins-temp.conf
+        state: absent
   notify: reload nginx
 
-- name: Remove temporary HTTP-only site file
-  file:
-    path: "/etc/nginx/sites-available/jenkins-temp.conf"
-    state: absent
-
-- name: Remove temporary symlink in sites-enabled
-  file:
-    path: "/etc/nginx/sites-enabled/jenkins-temp.conf"
-    state: absent
-  notify: reload nginx
-
-- name: Ensure Certbot timer is enabled
-  systemd:
+# ---------------------------------------------------------------------------
+# 4.  Make sure certbot renewals run automatically
+# ---------------------------------------------------------------------------
+- name: Ensure certbot.timer is enabled and started
+  ansible.builtin.systemd:
     name: certbot.timer
     enabled: true
     state: started
+
+# ---------------------------------------------------------------------------
+# 5.  Lock Jenkins to localhost
+# ---------------------------------------------------------------------------
+- name: Bind Jenkins HTTP listener to 127.0.0.1
+  ansible.builtin.lineinfile:
+    path: /etc/default/jenkins
+    regexp: '^HTTP_HOST='
+    line: 'HTTP_HOST=127.0.0.1'
+    state: present
+  notify: restart jenkins
+
+# ---------------------------------------------------------------------------
+# 6.  Read admin password & wait until Jenkins is up
+# ---------------------------------------------------------------------------
+- name: Read initial admin password
+  ansible.builtin.slurp:
+    src: /var/lib/jenkins/secrets/initialAdminPassword
+  register: initial_pw
+  run_once: true
+
+- name: Cache admin password fact
+  ansible.builtin.set_fact:
+    jenkins_admin_password: "{{ initial_pw.content | b64decode | trim }}"
+
+- name: Wait for Jenkins login page to respond
+  ansible.builtin.uri:
+    url: "http://localhost:8080/login"
+    status_code: 200
+  register: jstat
+  retries: 10
+  delay: 15
+  until: jstat.status == 200
+
+# ---------------------------------------------------------------------------
+# 7.  Install required Jenkins plugins
+# ---------------------------------------------------------------------------
+- name: Install OpenID-Connect and Role-Strategy plugins
+  community.general.jenkins_plugin:
+    name: "{{ item }}"
+    state: latest
+    url: "http://localhost:8080"
+    url_username: admin
+    url_password: "{{ jenkins_admin_password }}"
+    with_dependencies: true
+  loop:
+    - openid-connect
+    - role-strategy
+  notify: restart jenkins
+
+# ---------------------------------------------------------------------------
+# 8.  Drop Groovy init script
+# ---------------------------------------------------------------------------
+- name: Ensure init.groovy.d exists
+  ansible.builtin.file:
+    path: /var/lib/jenkins/init.groovy.d
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0755"
+
+- name: Deploy OIDC initialisation script
+  ansible.builtin.copy:
+    src: jenkins/oidc-init.groovy
+    dest: /var/lib/jenkins/init.groovy.d/01-oidc.groovy
+    owner: jenkins
+    group: jenkins
+    mode: "0644"
+  notify: restart jenkins

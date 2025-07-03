@@ -28,9 +28,13 @@
 
 *instances_status.sh
 
+# ansible inputs
+**/group_vars/all.yml
+**/host_vars/jenkins-ci.yml
+**/host_vars/master-node.yml
+
 # ansible outputs
 *kubeconfig*
-*master-node.yml
 **/anaconda_projects
 **/.ipynb_checkpoints
 **/group_vars/all.yml
