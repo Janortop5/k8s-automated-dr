@@ -50,9 +50,10 @@ pipeline {
                     autopep8  --in-place --recursive --aggressive --aggressive k8s-lstm/
 
                     # 4. strip notebook outputs **in-place**
-                    nbstripout --inplace k8s-lstm/notebook/lstm-disaster-recovery.ipynb
-                    #   or, for every notebook:
-                    #   find k8s-lstm -name '*.ipynb' -exec nbstripout --inplace {} +
+                    # strip a single notebook
+                    nbstripout k8s-lstm/notebook/lstm-disaster-recovery.ipynb
+                    # strip every notebook under k8s-lstm/
+                    # find k8s-lstm -name '*.ipynb' -exec nbstripout {} +
 
                     # 5. lint the final artefacts
                     nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
