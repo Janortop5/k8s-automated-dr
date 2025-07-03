@@ -29,7 +29,6 @@ pipeline {
           steps {
             cleanWs()      // kill stale workspace
             checkout scm   // fresh code
-            sh 'pip install -r requirements.txt'
           }
         }
 
