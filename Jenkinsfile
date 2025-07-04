@@ -98,21 +98,21 @@ pipeline {
             apiVersion: v1
             kind: Pod
             spec:
-                containers:
-                    - name: jnlp
-                        image: jenkins/inbound-agent:latest
-                    - name: kubectl
-                        image: bitnami/kubectl:latest
-                        command: ["sleep"]
-                        args: ["99d"]
-                        tty: true
-                        volumeMounts:
-                            - name: kubeconfig
-                                mountPath: /home/jenkins/.kube
+              containers:
+              - name: jnlp
+                image: jenkins/inbound-agent:latest
+            - name: kubectl
+                image: bitnami/kubectl:latest
+                command: ["sleep"]
+                args: ["99d"]
+                tty: true
+                volumeMounts:
+                  - name: kubeconfig
+                    mountPath: /home/jenkins/.kube
                 volumes:
-                    - name: kubeconfig
-                        secret:
-                            secretName: kubeconfig-prod
+                  - name: kubeconfig
+                    secret:
+                    secretName: kubeconfig-prod
             """
                 defaultContainer 'kubectl'   // so steps run here unless you say otherwise
                 }
