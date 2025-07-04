@@ -187,10 +187,15 @@ GitHub will ping the endpoint; you should see “*Payload delivered*” and a 20
 ## Reclaim Space on Jenkins Server
 
 ```bash
-sudo su -
-root@ip-10-0-2-239:~# #!/bin/bash
+sudo su - 
+
+#!/bin/bash
 docker system prune -af --volumes
 rm -rf /var/lib/jenkins/workspace/* /var/lib/jenkins/tmp/*
+
+# rebuild the workspace
+sudo su - jenkins
+mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
 ```
 
 ### That’s it!
