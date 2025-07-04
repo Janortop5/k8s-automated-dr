@@ -94,28 +94,31 @@ pipeline {
             agent {
                 kubernetes {
                 cloud 'k8s-automated-dr'
-                defaultContainer 'kubectl'
                 yaml """
             apiVersion: v1
             kind: Pod
-            metadata:
-            labels:
-              jenkins/agent: deploy
             spec:
-              containers:
-              - name: kubectl
-                image: janortop5/kubectl:with-coreutils
-                command:
-                - cat         # Jenkins will stream the agent.jar via 'cat'
-                tty: true
-                volumeMounts:
-                - name: kubeconfig
-                  mountPath: /home/jenkins/.kube
-              volumes:
-              - name: kubeconfig
-                secret:
-                secretName: kubeconfig-prod
+                containers:
+                    # Default JNLP agent – leave it alone
+                    - name: jnlp
+                    image: jenkins/inbound-agent:latest
+                    # starts agent automatically, no command/args needed
+
+                    # Your kubectl side-car
+                    - name: kubectl
+                    image: bitnami/kubectl:latest
+                    command: ["sleep"]
+                    args: ["99d"]
+                    tty: true
+                    volumeMounts:
+                        - name: kubeconfig
+                        mountPath: /home/jenkins/.kube
+                volumes:
+                    - name: kubeconfig
+                    secret:
+                        secretName: kubeconfig-prod
             """
+                defaultContainer 'kubectl'   // so steps run here unless you say otherwise
                 }
             }
             steps {
