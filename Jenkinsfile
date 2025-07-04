@@ -100,21 +100,21 @@ pipeline {
             kind: Pod
             metadata:
             labels:
-                jenkins/agent: deploy
+              jenkins/agent: deploy
             spec:
-            containers:
-                - name: kubectl
-                    image: janortop5/kubectl:with-coreutils
-                    command:
-                    - cat         # Jenkins will stream the agent.jar via 'cat'
-                    tty: true
-                    volumeMounts:
-                    - name: kubeconfig
-                    mountPath: /home/jenkins/.kube
-            volumes:
+              containers:
+              - name: kubectl
+                image: janortop5/kubectl:with-coreutils
+                command:
+                - cat         # Jenkins will stream the agent.jar via 'cat'
+                tty: true
+                volumeMounts:
                 - name: kubeconfig
-                    secret:
-                    secretName: kubeconfig-prod
+                mountPath: /home/jenkins/.kube
+              volumes:
+              - name: kubeconfig
+                secret:
+                secretName: kubeconfig-prod
             """
                 }
             }
