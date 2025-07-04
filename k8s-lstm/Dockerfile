@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY deployment/* .
+COPY deployment/ .
 
 # Install packages with memory-efficient options
 RUN pip install --user --no-cache-dir -r requirements.txt
@@ -61,7 +61,7 @@ COPY --from=builder /root/.local /root/.local
 # Make sure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
 
-COPY deployment/* .
+COPY deployment/ .
 
 # Expose port
 EXPOSE 8000

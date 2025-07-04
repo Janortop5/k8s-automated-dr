@@ -89,31 +89,50 @@ pipeline {
             }
         }
 
-        /* 4. Deploy with kubectl container                         */
+        /* 4. Deploy with kubectl pod                         */
         stage('Deploy') {
             agent {
-                docker {
-                    image 'bitnami/kubectl:latest'
-                    args  '-v /etc/timezone:/etc/timezone:ro ' +
-                          '-v /etc/localtime:/etc/localtime:ro' +
-                          '-u 0:0' // run as root:root inside the container
+                kubernetes {
+                cloud 'k8s-automated-dr'        // name of the cloud you configured
+                label 'jenkins-deploy-pod'            // unique label for this Pod
+                defaultContainer 'kubectl'
+                yaml """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+            labels:
+                jenkins/agent: deploy
+            spec:
+            containers:
+                - name: kubectl
+                image: janortop5/kubectl:with-coreutils
+                command:
+                    - cat                  # keep the container alive for the agent to inject
+                tty: true
+                volumeMounts:
+                    - name: kubeconfig
+                    mountPath: /home/jenkins/.kube
+            volumes:
+                - name: kubeconfig
+                secret:
+                    secretName: kubeconfig-prod  # already-created k8s Secret with your kubeconfig
+            """
                 }
             }
             steps {
-                withCredentials([file(
-                        credentialsId: 'kubeconfig-prod',
-                        variable: 'KUBECONFIG')]) {
-
-                    sh '''
-                        echo "🔧 Applying Kubernetes manifests..."
-                        kubectl version --short
-                        kubectl config view
-                        kubectl apply -f k8s-manifests/
-                    '''
+                container('kubectl') {
+                sh '''
+                    echo "🔧 Applying Kubernetes manifests..."
+                    kubectl version --short
+                    kubectl config view
+                    kubectl apply -f k8s-manifests/
+                '''
                 }
             }
             post {
-                success { echo '✅ Kubernetes manifests applied successfully.' }
+                success {
+                echo '✅ Kubernetes manifests applied successfully.'
+                }
             }
         }
     }
