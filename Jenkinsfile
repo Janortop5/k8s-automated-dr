@@ -110,7 +110,7 @@ pipeline {
                 tty: true
                 volumeMounts:
                 - name: kubeconfig
-                mountPath: /home/jenkins/.kube
+                  mountPath: /home/jenkins/.kube
               volumes:
               - name: kubeconfig
                 secret:
