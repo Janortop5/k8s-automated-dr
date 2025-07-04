@@ -109,9 +109,9 @@ pipeline {
                 volumeMounts:
                   - name: kubeconfig
                     mountPath: /home/jenkins/.kube
-                volumes:
-                  - name: kubeconfig
-                    secret:
+              volumes:
+                - name: kubeconfig
+                  secret:
                     secretName: kubeconfig-prod
             """
                 defaultContainer 'kubectl'   // so steps run here unless you say otherwise
