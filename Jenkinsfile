@@ -101,7 +101,7 @@ pipeline {
               containers:
               - name: jnlp
                 image: jenkins/inbound-agent:latest
-            - name: kubectl
+              - name: kubectl
                 image: bitnami/kubectl:latest
                 command: ["sleep"]
                 args: ["99d"]
