@@ -16,7 +16,6 @@ pipeline {
         FULL_IMAGE  = "${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
         DOCKER_CREDENTIALS     = credentials('dockerhub-pat')
-        KUBECONFIG_CREDENTIALS = credentials('kubeconfig-prod')
     }
 
     /* -------------------------------------------------------------- *
