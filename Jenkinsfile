@@ -107,6 +107,9 @@ pipeline {
                 command: ["sleep"]
                 args: ["99d"]
                 tty: true
+                securityContext:
+                    runAsUser: 1000
+                    runAsGroup: 1000
             """
                 defaultContainer 'kubectl'   // so steps run here unless you say otherwise
                 }
