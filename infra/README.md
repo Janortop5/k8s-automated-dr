@@ -123,7 +123,7 @@ exactly what the Kubernetes API expects.
    * Agent Docker Registry -> docker.io
    * Credentials	choose k8s-jenkins-agent.
    * WebSocket ? Direct Connection -> Select WebSocket
-   * Jenkins url -> jenkins https url (copy from ansible output)
+   * Jenkins url -> http://**jenkins_private_ip**:8080 (copy from automatically generated jenkins-ci host vars)
    * Transfer proxy related environment variables form controller to agent -> leave off
    * Restrict pipeline support to authorized folder -> leave off
    * Defaults provider Template? -> Leave Blank

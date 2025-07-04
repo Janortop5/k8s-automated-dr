@@ -29,6 +29,7 @@ resource "local_file" "jenkins-node-vars" {
 
   content = <<-EOF
   jenkins_public_ip: "${var.jenkins_ip}"
+  jenkins_private_ip: "${var.jenkins_private_ip}"
   EOF
 }
 

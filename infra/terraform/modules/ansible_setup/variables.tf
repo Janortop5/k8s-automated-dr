@@ -33,6 +33,9 @@ variable "jenkins_ip" {
   type = string
 }
 
+variable "jenkins_private_ip" {
+  type = string
+}
 variable "host_inventory" {
   type = object({
     filename = string

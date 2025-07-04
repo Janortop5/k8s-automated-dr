@@ -50,3 +50,7 @@ output "jenkins_public_ip" {
 output "master_private_ip" {
   value = module.ec2.master_private_ip
 }
+
+output "jenkins_private_ip" {
+  value = module.ec2.jenkins_private_ip
+}

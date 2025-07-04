@@ -21,6 +21,7 @@ module "ansible_setup" {
   master_ip  = module.ec2.master_public_ip
   worker_ips = module.ec2.worker_public_ips
   jenkins_ip = module.ec2.jenkins_public_ip
+  jenkins_private_ip = module.ec2.jenkins_private_ip
   master_private_ip = module.ec2.master_private_ip
 
   depends_on = [
