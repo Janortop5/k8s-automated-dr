@@ -120,6 +120,7 @@ pipeline {
                 container('kubectl') {
                 sh '''
                     echo "🔧 Applying Kubernetes manifests..."
+                    kubectl version
                     kubectl config view
                     kubectl apply -f k8s-manifests/
                 '''
