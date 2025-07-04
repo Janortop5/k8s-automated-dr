@@ -122,7 +122,12 @@ pipeline {
                     echo "🔧 Applying Kubernetes manifests..."
                     kubectl version
                     kubectl config view
-                    kubectl apply -R -f k8s-manifests/
+                    if kubectl api-resources | grep -q "stresschaos"; then
+                        echo "▶️  Applying Chaos Mesh experiments"
+                        kubectl apply -R -f k8s-manifests/
+                    else
+                        echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
+                    fi
                 '''
                 }
             }
