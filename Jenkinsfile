@@ -23,13 +23,14 @@ pipeline {
      * -------------------------------------------------------------- */
     stages {
 
-        // /* 1. Checkout once, on the host                           */
-        // stage('Prepare') {
-        //   steps {
-        //     cleanWs()      // kill stale workspace
-        //     checkout scm   // fresh code
-        //   }
-        // }
+        /* 1. Checkout once, on the host                           */
+        stage('Prepare') {
+          steps {
+            cleanWs()      // kill stale workspace
+            checkout scm   // fresh code
+            stash name: 'repo-source', includes: '**'
+          }
+        }
 
         // /* 2. Lint inside a Python container                       */
         // stage('Lint') {
@@ -110,7 +111,9 @@ pipeline {
                 defaultContainer 'kubectl'   // so steps run here unless you say otherwise
                 }
             }
+            options { skipDefaultCheckout() }
             steps {
+                unstash 'repo-source'
                 container('kubectl') {
                 sh '''
                     echo "🔧 Applying Kubernetes manifests..."
