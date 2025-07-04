@@ -122,7 +122,7 @@ pipeline {
                     echo "🔧 Applying Kubernetes manifests..."
                     kubectl version
                     kubectl config view
-                    kubectl apply -f k8s-manifests/
+                    kubectl apply -R -f k8s-manifests/
                 '''
                 }
             }
