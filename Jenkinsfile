@@ -99,12 +99,8 @@ pipeline {
             kind: Pod
             spec:
                 containers:
-                    # Default JNLP agent – leave it alone
                     - name: jnlp
                     image: jenkins/inbound-agent:latest
-                    # starts agent automatically, no command/args needed
-
-                    # Your kubectl side-car
                     - name: kubectl
                     image: bitnami/kubectl:latest
                     command: ["sleep"]
