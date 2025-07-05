@@ -1,7 +1,4 @@
 *k8s-cluster.pem
-*prometheus/grafana-login-details*
-*prometheus/prometheus-install-output*
-
 .git
 .gitignore
 .dockerignore
@@ -13,6 +10,7 @@
 **/tests
 **/docs
 **/hosts
+
 # Terraform directories
 **/.terraform/
 
@@ -26,15 +24,17 @@
 # Terraform plan files
 *.terraform.plan
 
-*instances_status.sh
-
-# ansible inputs
-*all.yml
-*jenkins-ci.yml
-*master-node.yml
+# ansible inputs / terraform's ansible setup outputs
+**/group_vars/all.yml
+**/host_vars/jenkins-ci.yml
+**/host_vars/master-node.yml
 
 # ansible outputs
 *kubeconfig*
+
+# anaconda environments
 **/anaconda_projects
 **/.ipynb_checkpoints
-**/group_vars/all.yml
+
+# python environments
+**/.venv
