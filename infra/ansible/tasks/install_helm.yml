@@ -51,6 +51,12 @@
     repo_url: https://grafana.github.io/helm-charts
   register: helm_repo_add
 
+# Add Chaos Mesh Helm repository
+- name: Add Chaos Mesh Helm repository
+  kubernetes.core.helm_repository:
+    name: chaos-mesh
+    repo_url: https://charts.chaos-mesh.org
+  register: helm_repo_add
 
 # Update Helm repositories
 - name: Update Helm repositories
@@ -103,3 +109,19 @@
                 labels:
                   job: kubernetes-audit
                   __path__: /var/log/kubernetes/audit/audit.log
+
+- name: Install Chaos Mesh
+  kubernetes.core.helm:
+    name: chaos-mesh
+    chart_ref: chaos-mesh/chaos-mesh
+    namespace: chaos-testing
+    create_namespace: true
+    state: present
+    kubeconfig: /etc/kubernetes/admin.conf 
+    values:
+      dashboard:
+        create: true
+      crds:
+        install: true
+      dnsServer:
+        create: true

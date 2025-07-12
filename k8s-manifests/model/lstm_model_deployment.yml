@@ -22,7 +22,7 @@ spec:
         - containerPort: 8000
         env:
         - name: MODEL_PATH
-          value: "/app/kubernetes_lstm_disaster_recovery(2).h5"
+          value: "/app/kubernetes_lstm_disaster_recovery.h5"
         resources:
           requests:
             memory: "1Gi"
@@ -71,4 +71,4 @@ metadata:
   name: lstm-model-config
   namespace: monitoring
 data:
-  MODEL_PATH: "/app/kubernetes_lstm_disaster_recovery(2).h5"
+  MODEL_PATH: "/app/kubernetes_lstm_disaster_recovery.h5"
