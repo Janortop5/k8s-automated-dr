@@ -12,7 +12,7 @@ pipeline {
     environment {
         IMAGE_NAME  = 'lstm-model'
         IMAGE_TAG   = 'latest'
-        REPOSITORY  = 'janortop5'
+        REPOSITORY  = 'freshinit'
         FULL_IMAGE  = "${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
         DOCKER_CREDENTIALS     = credentials('dockerhub-pat')
