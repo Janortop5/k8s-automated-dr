@@ -8,6 +8,11 @@ pipeline {
     options {
         timestamps()
     }
+    
+    parameters {
+        booleanParam(name: 'DEPLOY_STANDBY_ONLY', defaultValue: false, description: 'Deploy only standby environment')
+        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip test stages')
+    }
 
     environment {
         IMAGE_NAME  = 'lstm-model'
@@ -91,6 +96,9 @@ pipeline {
 
         /* 4. Deploy with kubectl pod                         */
         stage('Deploy') {
+            when {
+                not { params.DEPLOY_STANDBY_ONLY }
+            }
             agent {
                 kubernetes {
                 cloud 'k8s-automated-dr'
@@ -134,6 +142,25 @@ pipeline {
             post {
                 success {
                 echo '✅ Kubernetes manifests applied successfully.'
+                }
+            }
+
+            stage('Deploy Standby Terraform') {
+                when {
+                    anyOf {
+                        params.DEPLOY_STANDBY_ONLY
+                        // Add other conditions when you want this to run normally
+                    }
+                }
+                environment {
+                    TF_VAR_aws_access_key     = credentials('aws-access-key-id')      // Jenkins secret text
+                    TF_VAR_aws_secret_key     = credentials('aws-secret-access-key')  // Jenkins secret text
+                    TF_VAR_backup_bucket      = credentials('backup_bucket')
+                }
+                dir('./infra/terraform/standby_terraform') {  // 👈 Replace with the actual path
+                    sh 'terraform init'
+                    sh 'terraform plan -var-file=standby.tfvars'
+                    sh 'terraform apply -var-file=standby.tfvars -auto-approve'
                 }
             }
         }

@@ -25,3 +25,23 @@ variable "namecom_username" {
   sensitive   = true
   default     = ""
 }
+
+
+variable "aws_access_key" {
+  description = "AWS access key"
+  sensitive   = true
+}
+
+variable "aws_secret_key" {
+  description = "AWS secret key"
+  sensitive   = true
+}
+
+variable "backup_bucket_region" {
+  description = "AWS region"
+  default     = "us-east-1"
+}
+
+variable "backup_bucket" {
+  description = "S3 bucket for Velero"
+}
