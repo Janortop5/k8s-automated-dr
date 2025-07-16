@@ -13,3 +13,4 @@ jenkins_domain: "jenkins.{{ jenkins_public_ip }}.nip.io"
 letsencrypt_email: "emmanuelaladejana05@gmail.com"
 cert_path: "/etc/letsencrypt/live/{{ jenkins_domain }}/fullchain.pem"
 key_path: "/etc/letsencrypt/live/{{ jenkins_domain }}/privkey.pem"
+public_suffixes: ["nip.io"]
