@@ -152,16 +152,27 @@ pipeline {
                         // Add other conditions when you want this to run normally
                     }
                 }
-                environment {
-                    TF_VAR_aws_access_key     = credentials('aws-access-key-id')      // Jenkins secret text
-                    TF_VAR_aws_secret_key     = credentials('aws-secret-access-key')  // Jenkins secret text
-                    TF_VAR_backup_bucket      = credentials('backup_bucket')
+                withCredentials([
+                    file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
+                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_KEY'),
+                    string(credentialsId: 'backup_bucket', variable: 'BACKUP_BUCKET'),
+                    string(credentialsId: 'backup_bucket_region', variable: 'BACKUP_BUCKET_REGION')
+                    ]) {
+                    dir('./infra/terraform/standby_terraform') {
+                        sh '''
+                        export TF_VAR_aws_access_key=$AWS_ACCESS_KEY
+                        export TF_VAR_aws_secret_key=$AWS_SECRET_KEY
+                        export TF_VAR_backup_bucket=$BACKUP_BUCKET
+                        export TF_VAR_backup_bucket_region=$BACKUP_BUCKET_REGION
+
+                        terraform init
+                        terraform plan -var-file=standby.tfvars
+                        terraform apply -var-file=standby.tfvars -var "private_key_path=$PEM_KEY_PATH" -auto-approve
+                        '''
+                    }
                 }
-                dir('./infra/terraform/standby_terraform') {  // 👈 Replace with the actual path
-                    sh 'terraform init'
-                    sh 'terraform plan -var-file=standby.tfvars'
-                    sh 'terraform apply -var-file=standby.tfvars -auto-approve'
-                }
+
             }
         }
     }
