@@ -66,6 +66,13 @@ Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub
       * Filename: *jenkins-kubeconfig.yaml *
       * ID / Description: `k8s-jenkins-agent`     
 > KUBECONFIG IS GENERATED IN THE ANSIBLE OUTPUT IN TASK * Show local kubeconfig path and copy/paste hint * in tasks file '*bootstrap_master.yml*'
+5. **Add ssh key**
+
+   * a. 
+      * Kind: **secret text**
+      * Filename: k8s-cluster.pem
+      * ID / Description: `my-ssh-key`
+> NOTE: The ssh key for the main environment will be created in the infra/ directory and for the standby environment in infra/terraform/standby_terraform/ directory.
 
 
 ## 3B Configure Kubernetes Cloud in Jenkins
@@ -134,7 +141,7 @@ exactly what the Kubernetes API expects.
    * Whenever the playbook refreshes the token (e.g. re-run in 24 h) just upload
    * the new kube-config or replace the credential file; Jenkins picks it up without a restart.
 
-
+> NOTE: THIS STEPS 3A.4 TO BE CREATED AGAIN WHEN A STANDBY ENVIRONMENT IS CREATED.
 ## 4  Create the job
 
 ### Easiest: *Multibranch Pipeline* (auto-discovers branches & PRs)

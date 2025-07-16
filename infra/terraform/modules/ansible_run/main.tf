@@ -47,6 +47,7 @@ resource "null_resource" "ansible" {
                 -i ${var.local_exec.host_inventory.filename} \
                 ${var.local_exec.ansible_playbook.kubeadm} \
                 ${var.local_exec.ansible_playbook.jenkins} \
+                ${var.local_exec.ansible_playbook.velero} \
                 --private-key ${var.remote_exec.private_key_path} \
                 -u ${var.remote_exec.ssh_user} \
                 -vvv

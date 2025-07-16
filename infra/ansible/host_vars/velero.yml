@@ -1,0 +1,5 @@
+aws_region: "{{ lookup('env', 'TF_VAR_backup_bucket_region') }}"
+aws_access_key: "{{ lookup('env', 'TF_VAR_aws_access_key') }}"
+aws_secret_key: "{{ lookup('env', 'TF_VAR_aws_secret_key') }}"
+backup_bucket: "{{ lookup('env', 'TF_VAR_backup_bucket') }}"
+velero_version: "1.16.1"
