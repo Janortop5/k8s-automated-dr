@@ -152,23 +152,23 @@ pipeline {
                 kubernetes {
                     cloud 'k8s-automated-dr'
                     yaml """
-        apiVersion: v1
-        kind: Pod
-        spec:
-        serviceAccountName: jenkins-agent
-        containers:
-        - name: jnlp
-            image: jenkins/inbound-agent:latest
-        - name: kubectl
-            image: bitnami/kubectl:latest
-            command: ["sleep"]
-            args: ["99d"]
-            tty: true
-            securityContext:
-            runAsUser: 1000
-            runAsGroup: 1000
-        """
-                    defaultContainer 'kubectl'
+            apiVersion: v1
+            kind: Pod
+            spec:
+            serviceAccountName: jenkins-agent
+            containers:
+            - name: jnlp
+                image: jenkins/inbound-agent:latest
+            - name: kubectl
+                image: bitnami/kubectl:latest
+                command: ["sleep"]
+                args: ["99d"]
+                tty: true
+                securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+            """
+                defaultContainer 'kubectl'
                 }
             }
             options { skipDefaultCheckout() }
@@ -186,16 +186,15 @@ pipeline {
                             echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
                         fi
                     '''
+                    }
                 }
-            }
             post {
                 success {
                     echo '✅ Kubernetes manifests applied successfully.'
                 }
             }
+
         }
-
-
         stage('Deploy Standby Terraform') {
             when {
                 anyOf {
@@ -226,12 +225,10 @@ pipeline {
                 }
             }
         }
-
-    }
-
+    }  
     /* -------------------------------------------------------------- *
-     *  PIPELINE-LEVEL POST                                           *
-     * -------------------------------------------------------------- */
+    *  PIPELINE-LEVEL POST                                           *
+    * -------------------------------------------------------------- */
     post {
         always  { cleanWs() }
         success { echo "✅ Pipeline completed successfully. Image: ${FULL_IMAGE}" }
