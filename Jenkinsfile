@@ -94,57 +94,65 @@ pipeline {
         //     }
         // }
 
-//         /* 4. Deploy with kubectl pod                         */
-//         stage('Deploy') {
-//             when {
-//                 expression { return !params.DEPLOY_STANDBY_ONLY }
-//             }
-//             agent {
-//                 kubernetes {
-//                     cloud 'k8s-automated-dr'
-//                     yaml """
-// apiVersion: v1
-// kind: Pod
-// spec:
-//   serviceAccountName: jenkins-agent
-//   containers:
-//   - name: jnlp
-//     image: jenkins/inbound-agent:latest
-//   - name: kubectl
-//     image: bitnami/kubectl:latest
-//     command: ["sleep"]
-//     args: ["99d"]
-//     tty: true
-//     securityContext:
-//       runAsUser: 1000
-//       runAsGroup: 1000
-// """
-//                     defaultContainer 'kubectl'
-//                 }
-//             }
-//             options { skipDefaultCheckout() }
-//             steps {
-//                 unstash 'repo-source'
-//                 container('kubectl') {
-//                     sh '''
-//                         echo "🔧 Applying Kubernetes manifests..."
-//                         kubectl version
-//                         kubectl config view
-//                         if kubectl api-resources | grep -q "stresschaos"; then
-//                             echo "▶️  Applying Chaos Mesh experiments"
-//                             kubectl apply -R -f k8s-manifests/
-//                         else
-//                             echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
-//                         fi
-//                     '''
-//                 }
-//             }
-//             post {
-//                 success {
-//                     echo '✅ Kubernetes manifests applied successfully.'
-//                 }
-//             }
-//         }
+        /* 4. Deploy with kubectl pod                         */
+        stage('Deploy') {
+            when {
+                expression { return !params.DEPLOY_STANDBY_ONLY }
+            }
+            agent {
+                kubernetes {
+                    cloud 'k8s-automated-dr'
+                    yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins-agent
+  containers:
+  - name: jnlp
+    image: jenkins/inbound-agent:latest
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ["sleep"]
+    args: ["99d"]
+    tty: true
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+  - name: tools
+    image: freshinit/jenkins-agent-with-tools:latest
+    command: ["sleep"]
+    args: ["90d"]
+    tty: true
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+"""
+                    defaultContainer 'tools'
+                }
+            }
+            options { skipDefaultCheckout() }
+            steps {
+                unstash 'repo-source'
+                container('kubectl') {
+                    sh '''
+                        echo "🔧 Applying Kubernetes manifests..."
+                        kubectl version
+                        kubectl config view
+                        if kubectl api-resources | grep -q "stresschaos"; then
+                            echo "▶️  Applying Chaos Mesh experiments"
+                            kubectl apply -R -f k8s-manifests/
+                        else
+                            echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
+                        fi
+                    '''
+                }
+            }
+            post {
+                success {
+                    echo '✅ Kubernetes manifests applied successfully.'
+                }
+            }
+        }
         
         stage('Deploy Standby Terraform') {
             when {
