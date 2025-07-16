@@ -1,0 +1,96 @@
+---
+# Velero Installation Tasks - Manual CLI Method
+# Include this file in your playbook with: include_tasks: velero-tasks.yml
+
+- name: Create temporary directory for Velero installation
+  tempfile:
+    state: directory
+    suffix: velero
+  register: velero_temp_dir
+
+- name: Download Velero CLI
+  get_url:
+    url: "https://github.com/vmware-tanzu/velero/releases/download/v{{ velero_version }}/velero-v{{ velero_version }}-linux-amd64.tar.gz"
+    dest: "{{ velero_temp_dir.path }}/velero.tar.gz"
+    mode: '0644'
+
+- name: Extract Velero CLI
+  unarchive:
+    src: "{{ velero_temp_dir.path }}/velero.tar.gz"
+    dest: "{{ velero_temp_dir.path }}"
+    remote_src: yes
+
+- name: Find extracted Velero directory
+  find:
+    paths: "{{ velero_temp_dir.path }}"
+    patterns: "velero-*"
+    file_type: directory
+  register: velero_extract_dir
+
+- name: Install Velero CLI to /usr/local/bin
+  copy:
+    src: "{{ velero_extract_dir.files[0].path }}/velero"
+    dest: /usr/local/bin/velero
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Create Velero secret file
+  copy:
+    content: |
+      [default]
+      aws_access_key_id = {{ aws_access_key }}
+      aws_secret_access_key = {{ aws_secret_key }}
+    dest: "{{ velero_temp_dir.path }}/velero-secret"
+    mode: '0600'
+
+- name: Install Velero server components
+  shell: |
+    velero install \
+      --provider aws \
+      --plugins velero/velero-plugin-for-aws:v1.8.0 \
+      --bucket {{ backup_bucket }} \
+      --backup-location-config region={{ aws_region }} \
+      --snapshot-location-config region={{ aws_region }} \
+      --secret-file {{ velero_temp_dir.path }}/velero-secret
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
+
+- name: Wait for Velero deployment to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: velero
+    namespace: velero
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 300
+
+- name: Verify Velero installation
+  shell: velero get backup-locations
+  register: velero_backup_locations
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
+
+- name: Display Velero backup locations
+  debug:
+    msg: "{{ velero_backup_locations.stdout }}"
+
+- name: Clean up temporary directory
+  file:
+    path: "{{ velero_temp_dir.path }}"
+    state: absent
+
+- name: Create Velero backup schedule
+  shell: velero schedule create every-6-hours --schedule "0 */6 * * *" --ttl 72h
+  args:
+    executable: /bin/bash
+
+# - name: Ensure Velero backup schedule exists
+#   shell: |
+#     if ! velero schedule get latest &>/dev/null; then
+#       velero schedule create every-6-hours --schedule "0 */6 * * *" --ttl 72h
+#     fi
+#   args:
+#     executable: /bin/bash
