@@ -95,88 +95,138 @@ pipeline {
         // }
 
         /* 4. Deploy with kubectl pod                         */
+        // stage('Deploy') {
+        //     when {
+        //         not { params.DEPLOY_STANDBY_ONLY }
+        //     }
+        //     agent {
+        //         kubernetes {
+        //         cloud 'k8s-automated-dr'
+        //         yaml """
+        //     apiVersion: v1
+        //     kind: Pod
+        //     spec:
+        //       serviceAccountName: jenkins-agent
+        //       containers:
+        //       - name: jnlp
+        //         image: jenkins/inbound-agent:latest
+        //       - name: kubectl
+        //         image: bitnami/kubectl:latest
+        //         command: ["sleep"]
+        //         args: ["99d"]
+        //         tty: true
+        //         securityContext:
+        //             runAsUser: 1000
+        //             runAsGroup: 1000
+        //     """
+        //         defaultContainer 'kubectl'   // so steps run here unless you say otherwise
+        //         }
+        //     }
+        //     options { skipDefaultCheckout() }
+        //     steps {
+        //         unstash 'repo-source'
+        //         container('kubectl') {
+        //         sh '''
+        //             echo "🔧 Applying Kubernetes manifests..."
+        //             kubectl version
+        //             kubectl config view
+        //             if kubectl api-resources | grep -q "stresschaos"; then
+        //                 echo "▶️  Applying Chaos Mesh experiments"
+        //                 kubectl apply -R -f k8s-manifests/
+        //             else
+        //                 echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
+        //             fi
+        //         '''
+        //         }
+        //     }
+        //     post {
+        //         success {
+        //         echo '✅ Kubernetes manifests applied successfully.'
+        //         }
+        //     }
         stage('Deploy') {
             when {
-                not { params.DEPLOY_STANDBY_ONLY }
+                expression { return !params.DEPLOY_STANDBY_ONLY }
             }
             agent {
                 kubernetes {
-                cloud 'k8s-automated-dr'
-                yaml """
-            apiVersion: v1
-            kind: Pod
-            spec:
-              serviceAccountName: jenkins-agent
-              containers:
-              - name: jnlp
-                image: jenkins/inbound-agent:latest
-              - name: kubectl
-                image: bitnami/kubectl:latest
-                command: ["sleep"]
-                args: ["99d"]
-                tty: true
-                securityContext:
-                    runAsUser: 1000
-                    runAsGroup: 1000
-            """
-                defaultContainer 'kubectl'   // so steps run here unless you say otherwise
+                    cloud 'k8s-automated-dr'
+                    yaml """
+        apiVersion: v1
+        kind: Pod
+        spec:
+        serviceAccountName: jenkins-agent
+        containers:
+        - name: jnlp
+            image: jenkins/inbound-agent:latest
+        - name: kubectl
+            image: bitnami/kubectl:latest
+            command: ["sleep"]
+            args: ["99d"]
+            tty: true
+            securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+        """
+                    defaultContainer 'kubectl'
                 }
             }
             options { skipDefaultCheckout() }
             steps {
                 unstash 'repo-source'
                 container('kubectl') {
-                sh '''
-                    echo "🔧 Applying Kubernetes manifests..."
-                    kubectl version
-                    kubectl config view
-                    if kubectl api-resources | grep -q "stresschaos"; then
-                        echo "▶️  Applying Chaos Mesh experiments"
-                        kubectl apply -R -f k8s-manifests/
-                    else
-                        echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
-                    fi
-                '''
+                    sh '''
+                        echo "🔧 Applying Kubernetes manifests..."
+                        kubectl version
+                        kubectl config view
+                        if kubectl api-resources | grep -q "stresschaos"; then
+                            echo "▶️  Applying Chaos Mesh experiments"
+                            kubectl apply -R -f k8s-manifests/
+                        else
+                            echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
+                        fi
+                    '''
                 }
             }
             post {
                 success {
-                echo '✅ Kubernetes manifests applied successfully.'
+                    echo '✅ Kubernetes manifests applied successfully.'
                 }
             }
-
-            stage('Deploy Standby Terraform') {
-                when {
-                    anyOf {
-                        expression { return params.DEPLOY_STANDBY_ONLY }
-                        // add other conditions if needed
-                    }
-                }
-                steps {
-                    withCredentials([
-                        file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
-                        string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY'),
-                        string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_KEY'),
-                        string(credentialsId: 'backup_bucket', variable: 'BACKUP_BUCKET'),
-                        string(credentialsId: 'backup_bucket_region', variable: 'BACKUP_BUCKET_REGION')
-                    ]) {
-                        dir('./infra/terraform/standby_terraform') {
-                            sh '''
-                                export TF_VAR_aws_access_key=$AWS_ACCESS_KEY
-                                export TF_VAR_aws_secret_key=$AWS_SECRET_KEY
-                                export TF_VAR_backup_bucket=$BACKUP_BUCKET
-                                export TF_VAR_backup_bucket_region=$BACKUP_BUCKET_REGION
-
-                                terraform init
-                                terraform plan -var-file=standby.tfvars
-                                terraform apply -var-file=standby.tfvars -var "private_key_path=$PEM_KEY_PATH" -auto-approve
-                            '''
-                        }
-                    }
-                }
-            }
-
         }
+
+
+        stage('Deploy Standby Terraform') {
+            when {
+                anyOf {
+                    expression { return params.DEPLOY_STANDBY_ONLY }
+                    // add other conditions if needed
+                }
+            }
+            steps {
+                withCredentials([
+                    file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
+                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_KEY'),
+                    string(credentialsId: 'backup_bucket', variable: 'BACKUP_BUCKET'),
+                    string(credentialsId: 'backup_bucket_region', variable: 'BACKUP_BUCKET_REGION')
+                ]) {
+                    dir('./infra/terraform/standby_terraform') {
+                        sh '''
+                            export TF_VAR_aws_access_key=$AWS_ACCESS_KEY
+                            export TF_VAR_aws_secret_key=$AWS_SECRET_KEY
+                            export TF_VAR_backup_bucket=$BACKUP_BUCKET
+                            export TF_VAR_backup_bucket_region=$BACKUP_BUCKET_REGION
+
+                            terraform init
+                            terraform plan -var-file=standby.tfvars
+                            terraform apply -var-file=standby.tfvars -var "private_key_path=$PEM_KEY_PATH" -auto-approve
+                        '''
+                    }
+                }
+            }
+        }
+
     }
 
     /* -------------------------------------------------------------- *
