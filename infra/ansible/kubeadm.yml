@@ -13,6 +13,12 @@
       x86_64: amd64
       aarch64: arm64
     cni_plugin_arch: "{{ cni_arch_map[ansible_architecture] | default(ansible_architecture) }}"
+   
+    aws_region: "{{ lookup('env', 'TF_VAR_backup_bucket_region') }}"
+    aws_access_key: "{{ lookup('env', 'TF_VAR_aws_access_key') }}"
+    aws_secret_key: "{{ lookup('env', 'TF_VAR_aws_secret_key') }}"
+    backup_bucket: "{{ lookup('env', 'TF_VAR_backup_bucket') }}"
+    velero_version: "1.16.1"
   vars_files:
     - host_vars/master-node.yml
 
@@ -49,6 +55,16 @@
 
   - name: Install helm
     import_tasks: tasks/install_helm.yml
+    tags: kubernetes
+    when: "'master-node' in group_names"
+
+  - name: Restart CoreDNS before installing Velero
+    shell: kubectl rollout restart deployment coredns -n kube-system
+    when: "'master-node' in group_names"
+    tags: kubernetes
+  
+  - name: Setup Velero
+    import_tasks: tasks/velero.yml
     tags: kubernetes
     when: "'master-node' in group_names"
 
