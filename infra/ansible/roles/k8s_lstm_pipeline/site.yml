@@ -1,9 +1,0 @@
----
-# Main playbook that imports the K8s LSTM Data Pipeline role
-- name: Set up K8s LSTM Data Pipeline
-  hosts: localhost
-  connection: local
-  gather_facts: false
-  
-  roles:
-    - k8s_lstm_pipeline

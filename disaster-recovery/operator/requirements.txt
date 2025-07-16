@@ -1,3 +1,0 @@
-kopf>=1.38.0
-kubernetes>=26.0.0
-asyncio  # built-in, but can pin if you use backports

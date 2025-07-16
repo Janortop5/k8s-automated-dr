@@ -26,7 +26,6 @@
 
 # ansible inputs / terraform's ansible setup outputs
 **/group_vars/all.yml
-**/host_vars/jenkins-ci.yml
 **/host_vars/master-node.yml
 
 # ansible outputs
