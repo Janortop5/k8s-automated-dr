@@ -394,8 +394,8 @@ spec:
             steps {
                 withCredentials([
                     file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
-                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_KEY'),
+                    string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY'),
+                    string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_KEY'),
                     string(credentialsId: 'backup_bucket', variable: 'BACKUP_BUCKET'),
                     string(credentialsId: 'backup_bucket_region', variable: 'BACKUP_BUCKET_REGION')
                 ]) {
