@@ -38,8 +38,8 @@
   copy:
     content: |
       [default]
-      aws_access_key_id = {{ aws_access_key }}
-      aws_secret_access_key = {{ aws_secret_key }}
+      aws_access_key_id = {{ velero_aws_access_key }}
+      aws_secret_access_key = {{ velero_aws_secret_key }}
     dest: "{{ velero_temp_dir.path }}/velero-secret"
     mode: '0600'
 
@@ -48,15 +48,15 @@
     velero install \
       --provider aws \
       --plugins velero/velero-plugin-for-aws:v1.8.0 \
-      --bucket {{ backup_bucket }} \
-      --backup-location-config region={{ aws_region }} \
-      --snapshot-location-config region={{ aws_region }} \
+      --bucket {{ velero_bucket_name }} \
+      --backup-location-config region={{ velero_aws_region }} \
+      --snapshot-location-config region={{ velero_aws_region }} \
       --secret-file {{ velero_temp_dir.path }}/velero-secret
   environment:
     KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
 
 - name: Wait for Velero deployment to be ready
-  kubernetes.core.k8s_info:
+  kubernetes.core.k8s:
     api_version: apps/v1
     kind: Deployment
     name: velero
@@ -85,11 +85,4 @@
   shell: velero schedule create every-6-hours --schedule "0 */6 * * *" --ttl 72h
   args:
     executable: /bin/bash
-
-# - name: Ensure Velero backup schedule exists
-#   shell: |
-#     if ! velero schedule get latest &>/dev/null; then
-#       velero schedule create every-6-hours --schedule "0 */6 * * *" --ttl 72h
-#     fi
-#   args:
-#     executable: /bin/bash
+  ignore_errors: true

@@ -48,6 +48,7 @@ resource "null_resource" "ansible" {
                 ${var.local_exec.ansible_playbook.kubeadm} \
                 ${var.local_exec.ansible_playbook.jenkins} \
                 ${var.local_exec.ansible_playbook.velero} \
+                --vault-password-file ${var.local_exec.ansible_vault.vault_pass} \
                 --private-key ${var.remote_exec.private_key_path} \
                 -u ${var.remote_exec.ssh_user} \
                 -vvv

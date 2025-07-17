@@ -26,22 +26,17 @@ variable "namecom_username" {
   default     = ""
 }
 
-
-variable "aws_access_key" {
-  description = "AWS access key"
+variable "vault_address" {
+  description = "TF vault address"
   sensitive   = true
 }
 
-variable "aws_secret_key" {
-  description = "AWS secret key"
+variable "vault_token" {
+  description = "TF vault token"
   sensitive   = true
 }
 
-variable "backup_bucket_region" {
-  description = "AWS region"
-  default     = "us-east-1"
-}
-
-variable "backup_bucket" {
-  description = "S3 bucket for Velero"
+variable "ansible_vault_password" {
+  description = "Ansible Vault password"
+  sensitive   = true
 }

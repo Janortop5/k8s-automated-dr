@@ -2,10 +2,11 @@
 - hosts: master-node:worker-node:!jenkins-server
   become: true
   gather_facts: true
-  vars:
+  vars_files:
     - host_vars/velero.yml
+    - group_vars/secrets.yml
 
   tasks:
   - name: Install and Setup Velero
-    import_tasks: tasks/velero.yml
+    import_tasks: tasks/install_velero.yml
     tags: velero

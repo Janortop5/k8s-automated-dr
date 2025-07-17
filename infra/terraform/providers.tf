@@ -18,6 +18,10 @@ terraform {
       source  = "hashicorp/local"
       version = "~> 2.0"
     }
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 3.0"
+    }
     tls = {
       source  = "hashicorp/tls"
       version = "~> 4.0"
@@ -27,6 +31,11 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+}
+
+provider "vault" {
+  address = var.vault_address
+  token   = var.vault_token
 }
 
 # provider "namedotcom" {

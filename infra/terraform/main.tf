@@ -1,7 +1,3 @@
-module "ec2" {
-  source = "./modules/ec2"
-}
-
 # module "name_dot_com" {
 #   source = "./modules/name_dot_com"
 
@@ -11,6 +7,15 @@ module "ec2" {
 #   record_ip = module.ec2.jenkins_public_ip
 # }
 
+module "ec2" {
+  source = "./modules/ec2"
+}
+
+module "secret_vaults" {
+  source                 = "./modules/secret_vaults"
+  ansible_vault_password = var.ansible_vault_password
+}
+
 module "ansible_setup" {
   source = "./modules/ansible_setup"
   host_inventory = {
@@ -18,14 +23,15 @@ module "ansible_setup" {
   }
 
   # Pass in the lists/maps of IPs you need
-  master_ip  = module.ec2.master_public_ip
-  worker_ips = module.ec2.worker_public_ips
-  jenkins_ip = module.ec2.jenkins_public_ip
+  master_ip          = module.ec2.master_public_ip
+  worker_ips         = module.ec2.worker_public_ips
+  jenkins_ip         = module.ec2.jenkins_public_ip
   jenkins_private_ip = module.ec2.jenkins_private_ip
-  master_private_ip = module.ec2.master_private_ip
+  master_private_ip  = module.ec2.master_private_ip
 
   depends_on = [
-    module.ec2
+    module.ec2,
+    module.secret_vaults
   ]
 }
 

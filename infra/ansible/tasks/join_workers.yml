@@ -35,3 +35,47 @@
     --ignore-preflight-errors=all
   become: true
   when: node_check.rc != 0
+
+- name: Ensure kubeconfig directory exists on worker
+  file:
+    path: "{{ ansible_env.HOME }}/.kube"
+    state: directory
+    mode: '0755'
+
+- name: Create kubeconfig on worker node
+  copy:
+    content: "{{ kubeconfig_data | b64decode }}"
+    dest: "{{ ansible_env.HOME }}/.kube/config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+###################################################
+#  Ensure Python3 and pip exist (dist-agnostic)   #
+###################################################
+- name: Install python3 & pip on worker
+  become: true
+  package:
+    name:
+      - python3
+      - python3-pip
+  when:
+    - "'worker-node' in group_names"
+    - ansible_pkg_mgr == "apt"
+
+- name: Install python3 & pip on worker (Yum/RHEL/Amazon Linux)
+  become: true
+  package:
+    name:
+      - python3
+      - python3-pip
+  when:
+    - "'worker-node' in group_names"
+    - ansible_pkg_mgr == "yum"
+
+- name: Install Kubernetes Python client (pip3)
+  become: true
+  pip:
+    name: kubernetes==27.2.0
+    executable: pip3
+  when: "'worker-node' in group_names"

@@ -80,6 +80,24 @@
     mode: '0644'
     remote_src: true
 
+# Add these tasks to save kubeconfig for workers
+- name: Read kubeconfig content
+  slurp:
+    src: "{{ ansible_env.HOME }}/.kube/config"
+  register: kubeconfig_content
+
+- name: Save kubeconfig for worker nodes
+  set_fact:
+    kubeconfig_data: "{{ kubeconfig_content.content }}"
+
+- name: Expose kubeconfig to all worker-node hosts
+  add_host:
+    name: "{{ item }}"
+    groups: worker-node
+    kubeconfig_data: "{{ kubeconfig_data }}"
+  loop: "{{ groups['worker-node'] }}"
+  run_once: true
+
 - name: Install Calico network plugin
   command: >
     kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml

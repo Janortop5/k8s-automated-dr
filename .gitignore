@@ -37,3 +37,12 @@
 
 # python environments
 **/.venv
+
+#ansible vault password
+.vault_pass
+*/.vault_pass
+**/.vault_pass
+
+secrets.yml
+*/secrets.yml
+**/secrets.yml

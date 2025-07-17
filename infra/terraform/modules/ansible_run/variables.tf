@@ -6,13 +6,15 @@ variable "remote_exec" {
   }
 }
 
-variable "local_exec" {
+variable "local_exec" { 
   type = map(any)
   default = {
     host_inventory = { filename = "../ansible/hosts" },
     ansible_config = { filename = "../ansible/ansible.cfg" },
     ansible_playbook = { kubeadm = "../ansible/kubeadm.yml", jenkins = "../ansible/jenkins.yml", velero = "../ansible/velero.yml" },
     ansible_vars = { filename = "../ansible/host_vars/master-node.yml" },
+    ansible_secrets = { secret = "../ansible/secrets.yml" },
+    ansible_vault = { vault_pass = "../ansible/.vault_pass"},
   }
 }
 

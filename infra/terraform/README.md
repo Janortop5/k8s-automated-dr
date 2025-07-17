@@ -1,7 +1,44 @@
 # Terraform
 This Terraform Configuration creates a Functional Kubeadm Kubernetes Environment and a Jenkins CI Server, both on AWS.
 
+# Prerequisite
+- Installation of **Docker** locally
+- Installation of **Terraform** locally
+- Instalation of **Ansibe** locally
+
 ## How to use our terraform IaC
+#### First create Terraform vault.
+- Create terraform vault docker container.
+```bash
+docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=your-tf-vault-token' --name 'tf_vault' -p 8200:8200 hashicorp/vault:latest
+```
+- Add environment variables.
+```bash
+export TF_VAR_vault_address="http://127.0.0.1:8200"
+export TF_VAR_ansible_vault_password="your-ansible-vault-password*
+export TF_VAR_vault_token='your-tf-vault-token'
+```
+#### Test Vault Setup
+- **Create test password.**
+```bash
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-tf-vault-token && vault kv put secret/test username='admin' password='1234'"
+```
+- **Test connection:** look for output -> `test_username = "admin"`
+```
+terraform init
+terraform fmt
+terraform plan
+
+#Look for output -> test_username = "admin" -> connection success ✅
+```
+- **Create TF Vault Secrets**
+```bash
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login *specified_token* && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
+
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/velero bucket_name='my-velero-backups' region='us-west-2'"
+```
+#### Run Terraform
+- Format, Validate, Initialize and run the Terraform Configuration.
 ```bash
 terraform fmt                       # ensure code is in right format
 terraform validate                  # validate code is correct
@@ -10,7 +47,7 @@ terraform init                      # intialize terraform
 terraform plan -out .terraform.plan # view resources to be created.
 terraform apply ".terraform.plan"   # apply the terraform configuration
 ```
-To replace an existing resource
+- **To replace an existing resource**
 ```bash
 terraform plan -replace=" **resource_name** " -out .terraform.plan
 terraform apply ".terraform.plan"

@@ -30,6 +30,8 @@ ansible-playbook \
   ${var.local_exec.ansible_playbook.playbook} \   # Main playbook file, runs both kubeadm and jenkins
   # ${var.local_exec.ansible_playbook.kubeadm} \      # playbook file for kubeadm setup
   # ${var.local_exec.ansible_playbook.jenkins} \    # playbook file for jenkins setup
+  # ${var.local_exec.ansible_playbook.velero} \  # Encrypted secrets file
+  --vault-password-file ${var.local_exec.ansible_vault.vault_pass} \
   --private-key ${var.remote_exec.private_key_path} \
   -u ${var.remote_exec.ssh_user} \
   -vvv

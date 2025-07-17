@@ -54,3 +54,12 @@ output "master_private_ip" {
 output "jenkins_private_ip" {
   value = module.ec2.jenkins_private_ip
 }
+
+output "vault_secrets_created" {
+  value = module.secret_vaults.vault_secrets_created
+}
+
+output "test_username" {
+  value = module.secret_vaults.test_username
+  sensitive = false
+}

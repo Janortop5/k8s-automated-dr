@@ -11,9 +11,15 @@ variable "local_exec" {
   default = {
     host_inventory = { filename = "../ansible/hosts" },
     ansible_config = { filename = "../ansible/ansible.cfg" },
-    ansible_playbook = { playbook = "../ansible/playbook.yml", kubeadm = "../ansible/kubeadm.yml", jenkins = "../ansible/jenkins.yml" },
-    ansible_vars = { master-node = "../ansible/host_vars/master-node.yml", 
-                    jenkins-node = "../ansible/group_vars/all.yml" },
+    ansible_playbook = { playbook = "../ansible/playbook.yml",
+                         kubeadm = "../ansible/kubeadm.yml",
+                         jenkins = "../ansible/jenkins.yml",
+                         velero = "../ansible/velero.yml",
+    },
+    ansible_vars = { master-node = "../ansible/host_vars/master-node.yml",
+                    jenkins-node = "../ansible/group_vars/all.yml",
+                    velero = "../ansible/group_vars/velero.yml" },
+    ansible_vault = { vault_pass = "../ansible/.vault_pass" },
   }
 }
 
