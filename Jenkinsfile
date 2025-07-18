@@ -399,6 +399,10 @@ spec:
                             echo "[INFO] Current user:"
                             whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
 
+                            if ! whoami &>/dev/null; then
+                                echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
+                            fi
+
                             echo "[INFO] Initializing Terraform..."
                             terraform init
 
