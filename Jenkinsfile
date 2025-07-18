@@ -389,29 +389,24 @@ spec:
                 ]) {
                     dir('./infra/terraform/standby_terraform') {
                         sh '''
-                            set -e
+                            set -e  # Exit immediately on error
 
-                            export TF_VAR_aws_access_key=$AWS_ACCESS_KEY
-                            export TF_VAR_aws_secret_key=$AWS_SECRET_KEY
-                            export TF_VAR_backup_bucket=$BACKUP_BUCKET
-                            export TF_VAR_backup_bucket_region=$BACKUP_BUCKET_REGION
+                            echo "[INFO] Setting up safe HOME directory..."
+                            export HOME="$WORKSPACE/tmp_home"
+                            mkdir -p "$HOME"
 
-                            echo "HOME: $HOME"
-                            whoami
-                            id
-                            ls -la ~
+                            echo "[INFO] HOME set to: $HOME"
+                            echo "[INFO] Current user:"
+                            whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
 
+                            echo "[INFO] Initializing Terraform..."
                             terraform init
 
-                            terraform plan -out .terraform.plan
+                            echo "[INFO] Planning Terraform deployment..."
+                            terraform plan -out=tfplan
 
-                            if terraform apply .terraform.plan; then
-                                echo "✅ Terraform apply succeeded."
-                            else
-                                echo "❌ Terraform apply failed. Running terraform destroy..."
-                                terraform destroy -auto-approve || echo "⚠️ Terraform destroy also failed."
-                                exit 1
-                            fi
+                            echo "[INFO] Applying Terraform plan..."
+                            terraform apply tfplan
                         '''
                     }
                 }
