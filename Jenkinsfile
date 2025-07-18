@@ -395,6 +395,7 @@ spec:
                             export TF_VAR_aws_secret_key=$AWS_SECRET_KEY
                             export TF_VAR_backup_bucket=$BACKUP_BUCKET
                             export TF_VAR_backup_bucket_region=$BACKUP_BUCKET_REGION
+                            export HOME=/tmp
 
                             terraform init
 
