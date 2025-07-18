@@ -381,7 +381,7 @@ spec:
             steps {
                 unstash 'repo-source'
                 withCredentials([
-                    file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
+                    // file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
                     string(credentialsId: 'aws_access_key', variable: 'AWS_ACCESS_KEY'),
                     string(credentialsId: 'aws_secret_key', variable: 'AWS_SECRET_KEY'),
                     string(credentialsId: 'backup_bucket', variable: 'BACKUP_BUCKET'),
@@ -396,7 +396,7 @@ spec:
 
                             terraform init
                             terraform plan -var-file=standby.tfvars
-                            terraform apply -var-file=standby.tfvars -var "private_key_path=$PEM_KEY_PATH" -auto-approve
+                            terraform apply -var-file=standby.tfvars  -auto-approve
                         '''
                     }
                 }
@@ -410,3 +410,5 @@ spec:
         failure { echo '❌ Pipeline failed' }
     }
 }
+
+// -var "private_key_path=$PEM_KEY_PATH"
