@@ -389,14 +389,24 @@ spec:
                 ]) {
                     dir('./infra/terraform/standby_terraform') {
                         sh '''
+                            set -e
+
                             export TF_VAR_aws_access_key=$AWS_ACCESS_KEY
                             export TF_VAR_aws_secret_key=$AWS_SECRET_KEY
                             export TF_VAR_backup_bucket=$BACKUP_BUCKET
                             export TF_VAR_backup_bucket_region=$BACKUP_BUCKET_REGION
 
                             terraform init
+
                             terraform plan -out .terraform.plan
-                            terraform apply .terraform.plan
+
+                            if terraform apply .terraform.plan; then
+                                echo "✅ Terraform apply succeeded."
+                            else
+                                echo "❌ Terraform apply failed. Running terraform destroy..."
+                                terraform destroy -auto-approve || echo "⚠️ Terraform destroy also failed."
+                                exit 1
+                            fi
                         '''
                     }
                 }
