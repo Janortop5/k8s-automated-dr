@@ -406,7 +406,7 @@ spec:
     
     post {
         always { cleanWs() }
-        success { echo "✅ Pipeline completed successfully. Image: ${FULL_IMAGE}" }
+        success { echo "✅ Pipeline completed successfully." }
         failure { echo '❌ Pipeline failed' }
     }
 }
