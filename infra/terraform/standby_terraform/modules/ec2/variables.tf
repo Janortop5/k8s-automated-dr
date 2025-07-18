@@ -123,7 +123,7 @@ variable "alb_inbound_ports" {
 variable "alb" {
   type = map(string)
   default = {
-    name               = "k8s-lb"
+    name               = "standby-k8s-lb"
     load_balancer_type = "application"
   }
 }
