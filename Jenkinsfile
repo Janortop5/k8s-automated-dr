@@ -216,7 +216,6 @@
 //     }
 // }
 
-
 pipeline {
     agent any
     options {
@@ -315,9 +314,8 @@ spec:
                         else
                             echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
                             # Apply non-chaos manifests only
-                            find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | \
-                            while read file; do
-                                if ! grep -q "kind: StressChaos\|kind: PodChaos\|kind: NetworkChaos" "$file"; then
+                            find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
+                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "$file"; then
                                     kubectl apply -f "$file"
                                 fi
                             done
