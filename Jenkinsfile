@@ -110,6 +110,7 @@ spec:
   containers:
   - name: jnlp
     image: jenkins/inbound-agent:latest
+    args: ['\$(JENKINS_SECRET)', '\$(JENKINS_NAME)']
   - name: kubectl
     image: bitnami/kubectl:latest
     command: ["sleep"]
@@ -165,6 +166,7 @@ spec:
   containers:
   - name: jnlp
     image: jenkins/inbound-agent:latest
+    args: ['\$(JENKINS_SECRET)', '\$(JENKINS_NAME)']
 
   - name: tools
     image: freshinit/jenkins-agent-with-tools:latest
