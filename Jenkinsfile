@@ -395,8 +395,8 @@ spec:
                             export TF_VAR_backup_bucket_region=$BACKUP_BUCKET_REGION
 
                             terraform init
-                            terraform plan -var-file=standby.tfvars
-                            terraform apply -var-file=standby.tfvars  -auto-approve
+                            terraform plan -out .terraform.plan
+                            terraform apply .terraform.plan
                         '''
                     }
                 }
