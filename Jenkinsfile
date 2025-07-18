@@ -295,8 +295,8 @@ spec:
                 container('kubectl') {
                     sh '''
                         echo "🔧 Applying Kubernetes manifests..."
-                        kubectl version --client
-                        kubectl config view --minify
+                        kubectl version 
+                        kubectl config view 
                         
                         # Check if we can connect to the cluster
                         if ! kubectl get nodes; then
