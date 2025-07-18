@@ -118,16 +118,8 @@ spec:
     securityContext:
       runAsUser: 1000
       runAsGroup: 1000
-  - name: tools
-    image: freshinit/jenkins-agent-with-tools:latest
-    command: ["sleep"]
-    args: ["90d"]
-    tty: true
-    securityContext:
-      runAsUser: 1000
-      runAsGroup: 1000
 """
-                    defaultContainer 'tools'
+                    defaultContainer 'kubectl'
                 }
             }
             options { skipDefaultCheckout() }
@@ -161,6 +153,33 @@ spec:
                     // add other conditions if needed
                 }
             }
+
+            agent {
+                kubernetes {
+                    cloud 'k8s-automated-dr'
+                    yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins-agent
+  containers:
+  - name: jnlp
+    image: jenkins/inbound-agent:latest
+
+  - name: tools
+    image: freshinit/jenkins-agent-with-tools:latest
+    command: ["sleep"]
+    args: ["90d"]
+    tty: true
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+"""
+       
+                    defaultContainer 'tools'
+                }
+            }
+            options { skipDefaultCheckout() }
             steps {
                 withCredentials([
                     file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
