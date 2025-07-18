@@ -262,9 +262,6 @@ spec:
   containers:
   - name: jnlp
     image: jenkins/inbound-agent:latest
-    env:
-    - name: JENKINS_URL
-      value: "${env.JENKINS_URL}"
     resources:
       requests:
         memory: "256Mi"
@@ -353,9 +350,6 @@ spec:
   containers:
   - name: jnlp
     image: jenkins/inbound-agent:latest
-    env:
-    - name: JENKINS_URL
-      value: "${env.JENKINS_URL}"
     resources:
       requests:
         memory: "256Mi"
