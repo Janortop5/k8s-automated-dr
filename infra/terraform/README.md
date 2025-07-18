@@ -14,9 +14,10 @@ docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=your-tf-vault-tok
 ```
 - Add environment variables.
 ```bash
-export TF_VAR_vault_address="http://127.0.0.1:8200"
-export TF_VAR_ansible_vault_password="your-ansible-vault-password*
+export TF_VAR_vault_address='http://127.0.0.1:8200'
+export TF_VAR_ansible_vault_password='your-ansible-vault-password'
 export TF_VAR_vault_token='your-tf-vault-token'
+export TF_LOG=DEBUG
 ```
 #### Test Vault Setup
 - **Create test password.**
@@ -33,7 +34,7 @@ terraform plan
 ```
 - **Create TF Vault Secrets**
 ```bash
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login *specified_token* && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token* && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
 
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/velero bucket_name='my-velero-backups' region='us-west-2'"
 ```

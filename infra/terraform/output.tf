@@ -60,6 +60,6 @@ output "vault_secrets_created" {
 }
 
 output "test_username" {
-  value = module.secret_vaults.test_username
+  value     = module.secret_vaults.test_username
   sensitive = false
 }

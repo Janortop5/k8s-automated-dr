@@ -19,6 +19,12 @@ variable "aws_region" {
   default     = "us-west-2"
 }
 
+variable "remote_state_bucket_region" {
+  description = "The AWS region where the S3 bucket for TF state is located"
+  type        = string
+  default     = "us-west-2"
+}
+
 variable "namecom_username" {
   description = "Your Name.com account username"
   type        = string

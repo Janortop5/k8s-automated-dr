@@ -1,4 +1,3 @@
-# root/providers.tf
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -30,7 +29,20 @@ terraform {
 }
 
 provider "aws" {
+  alias  = "virginia"
   region = var.aws_region
+}
+
+provider "aws" {
+  alias  = "remote_state"
+  region = var.remote_state_bucket_region
+
+  # Add these if not present
+  default_tags {
+    tags = {
+      Environment = "terraform-remote-state"
+    }
+  }
 }
 
 provider "vault" {

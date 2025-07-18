@@ -11,6 +11,22 @@ module "ec2" {
   source = "./modules/ec2"
 }
 
+# THIS MODULE MUST RUN BEFORE THE STANDBY_TERRAFORM MODULE (INITIALIZES ITS REMOTE BACKEND)
+module "remote_state" {
+  source = "./modules/remote_state"
+
+  # THE VALUES BELOW TO BE SPECIFIED IN THE VARIABLE BLOCKS OF THE STANDBY CLUSTER'S 'variables.tf' FILE
+  # THE RESOURCES FOR REMOTE TF STATE (BUCKET AND DYNAMODB TABLE) MUST BE CREATED IN THE SAME REGION AS THE STANDBY MODULE i.e.
+  # standby_terraform/providers.tf: 'var.aws_region = "us-west-2' -> 'var.bucket_region = "us-west-2"'
+  tf_state_bucket = "k8s-automated-dr"
+  tf_state_key    = "standby/terraform.tfstate"
+  tf_state_table  = "terraform-state-lock"
+
+  providers = {
+    aws.remote_state = aws.remote_state # -> THIS REGION MUST MATCH THE STANDBY TERRAFORM MODULE REGION
+  }
+}
+
 module "secret_vaults" {
   source                 = "./modules/secret_vaults"
   ansible_vault_password = var.ansible_vault_password

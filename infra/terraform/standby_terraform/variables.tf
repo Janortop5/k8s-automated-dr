@@ -25,3 +25,21 @@ variable "namecom_username" {
   sensitive   = true
   default     = ""
 }
+
+variable "tf_state_bucket" {
+  description = "The S3 bucket to store the Terraform state file"
+  type        = string
+  default = "k8s-automated-dr-tf-state"
+}
+
+variable "tf_state_key" {
+  description = "The key for the Terraform state file in S3"
+  type        = string
+  default = "standby/terraform.tfstate"
+}
+
+variable "tf_state_table" {
+  description = "The DynamoDB table for Terraform state locking"
+  type        = string
+  default = "terraform-state-lock"
+}

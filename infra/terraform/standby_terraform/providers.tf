@@ -19,6 +19,13 @@ terraform {
       version = "~> 4.0"
     }
   }
+  backend "s3" {
+   region         = "us-west-2"
+   bucket         = "k8s-automated-dr"
+   key            = "standby/terraform.tfstate"
+   dynamodb_table = "terraform-state-lock"
+   encrypt        = true
+ }
 }
 
 provider "aws" {
