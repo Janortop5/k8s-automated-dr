@@ -34,3 +34,9 @@ variable "tf_state_table" {
   description = "The DynamoDB table for Terraform state locking"
   type        = string
 }
+
+variable "check_existing_resources" {
+  description = "Whether to check if resources already exist before creating them"
+  type        = bool
+  default     = true
+}

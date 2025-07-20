@@ -1,6 +1,8 @@
+# S3 Bucket - only create if it doesn't exist
 resource "aws_s3_bucket" "tf_backend_bucket" {
   provider = aws.remote_state
-  bucket = var.tf_state_bucket
+  count    = local.create_bucket ? 1 : 0
+  bucket   = var.tf_state_bucket
 
   lifecycle {
     prevent_destroy = true
@@ -13,16 +15,17 @@ resource "aws_s3_bucket" "tf_backend_bucket" {
 }
 
 resource "aws_s3_bucket_acl" "tf_backend_bucket_acl" {
-  provider = aws.remote_state
-  bucket = aws_s3_bucket.tf_backend_bucket.id
-  acl    = "private"
+  provider   = aws.remote_state
+  count      = local.create_bucket ? 1 : 0
+  bucket     = local.bucket_id
+  acl        = "private"
   depends_on = [aws_s3_bucket_ownership_controls.tf_backend_bucket_ownership]
 }
 
-
 resource "aws_s3_bucket_ownership_controls" "tf_backend_bucket_ownership" {
   provider = aws.remote_state
-  bucket = aws_s3_bucket.tf_backend_bucket.id
+  count    = local.create_bucket ? 1 : 0
+  bucket   = local.bucket_id
 
   rule {
     object_ownership = "BucketOwnerPreferred"
@@ -31,7 +34,9 @@ resource "aws_s3_bucket_ownership_controls" "tf_backend_bucket_ownership" {
 
 resource "aws_s3_bucket_versioning" "tf_backend_bucket_versioning" {
   provider = aws.remote_state
-  bucket = aws_s3_bucket.tf_backend_bucket.id
+  count    = local.create_bucket ? 1 : 0
+  bucket   = local.bucket_id
+  
   versioning_configuration {
     status = "Enabled"
   }
@@ -39,7 +44,8 @@ resource "aws_s3_bucket_versioning" "tf_backend_bucket_versioning" {
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "tf_backend_bucket_encryption" {
   provider = aws.remote_state
-  bucket = aws_s3_bucket.tf_backend_bucket.id
+  count    = local.create_bucket ? 1 : 0
+  bucket   = local.bucket_id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -49,9 +55,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tf_backend_bucket
   }
 }
 
-resource "aws_dynamodb_table" "basic-dynamodb-table" {
+resource "aws_s3_bucket_policy" "tf_backend_bucket_policy" {
   provider = aws.remote_state
-  count          = var.aws_dynamodb_table_enabled ? 1 : 0
+  count    = local.create_policy ? 1 : 0
+  bucket   = local.bucket_id
+  policy   = local.tf_backend_bucket_policy_json
+}
+
+# DynamoDB Table - only create if it doesn't exist and is enabled
+resource "aws_dynamodb_table" "basic-dynamodb-table" {
+  provider       = aws.remote_state
+  count          = local.create_table ? 1 : 0
   name           = "terraform-state-lock"
   billing_mode   = "PROVISIONED"
   read_capacity  = var.read_capacity
@@ -71,10 +85,4 @@ resource "aws_dynamodb_table" "basic-dynamodb-table" {
   lifecycle {
     prevent_destroy = true
   }
-}
-
-resource "aws_s3_bucket_policy" "tf_backend_bucket_policy" {
-  provider = aws.remote_state
-  bucket   = aws_s3_bucket.tf_backend_bucket.id
-  policy   = local.tf_backend_bucket_policy_json
 }

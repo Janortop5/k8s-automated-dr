@@ -2,6 +2,49 @@ data "aws_caller_identity" "current" {
   provider = aws.remote_state
 }
 
+# Data sources to check if resources exist
+data "aws_s3_bucket" "existing_bucket" {
+  provider = aws.remote_state
+  count    = var.check_existing_resources ? 1 : 0
+  bucket   = var.tf_state_bucket
+  
+  # This will fail gracefully if bucket doesn't exist
+  lifecycle {
+    postcondition {
+      condition     = self.id != ""
+      error_message = "Bucket does not exist"
+    }
+  }
+}
+
+data "aws_dynamodb_table" "existing_table" {
+  provider = aws.remote_state
+  count    = var.check_existing_resources && var.aws_dynamodb_table_enabled ? 1 : 0
+  name     = "terraform-state-lock"
+  
+  # This will fail gracefully if table doesn't exist
+  lifecycle {
+    postcondition {
+      condition     = self.name != ""
+      error_message = "DynamoDB table does not exist"
+    }
+  }
+}
+
+# Check if bucket policy already exists
+data "aws_s3_bucket_policy" "existing_policy" {
+  provider = aws.remote_state
+  count    = var.check_existing_resources ? 1 : 0
+  bucket   = var.tf_state_bucket
+  
+  lifecycle {
+    postcondition {
+      condition     = self.policy != ""
+      error_message = "Bucket policy does not exist"
+    }
+  }
+}
+
 data "aws_iam_policy_document" "tf_backend_bucket_policy" {
   provider = aws.remote_state
   # Allow authenticated access for the current account
@@ -24,8 +67,8 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
     ]
 
     resources = [
-      "${aws_s3_bucket.tf_backend_bucket.arn}",
-      "${aws_s3_bucket.tf_backend_bucket.arn}/*"
+      local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn,
+      "${local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn}/*"
     ]
 
     principals {
@@ -44,8 +87,8 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
     ]
 
     resources = [
-      "${aws_s3_bucket.tf_backend_bucket.arn}/*",
-      "${aws_s3_bucket.tf_backend_bucket.arn}"
+      "${local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn}/*",
+      local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn
     ]
 
     condition {
@@ -71,7 +114,7 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
     ]
 
     resources = [
-      "${aws_s3_bucket.tf_backend_bucket.arn}/*",
+      "${local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn}/*",
     ]
 
     condition {
@@ -91,5 +134,19 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
 }
 
 locals {
+  # Determine if resources exist
+  bucket_exists = var.check_existing_resources ? length(data.aws_s3_bucket.existing_bucket) > 0 : false
+  table_exists  = var.check_existing_resources && var.aws_dynamodb_table_enabled ? length(data.aws_dynamodb_table.existing_table) > 0 : false
+  policy_exists = var.check_existing_resources ? length(data.aws_s3_bucket_policy.existing_policy) > 0 : false
+  
+  # Determine what to create
+  create_bucket = !local.bucket_exists
+  create_table  = var.aws_dynamodb_table_enabled && !local.table_exists
+  create_policy = !local.policy_exists
+  
+  # Bucket ID reference (existing or new)
+  bucket_id = local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].id : aws_s3_bucket.tf_backend_bucket[0].id
+  
+  # Policy JSON
   tf_backend_bucket_policy_json = data.aws_iam_policy_document.tf_backend_bucket_policy.json
 }
