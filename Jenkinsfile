@@ -374,8 +374,11 @@ spec:
                             echo "[INFO] Planning Terraform deployment..."
                             terraform plan -out=tfplan
 
-                            echo "[INFO] Applying Terraform plan..."
-                            terraform apply tfplan
+                            if ! terraform apply tfplan; then
+                                echo "[ERROR] Terraform apply failed, destroying resources..."
+                                terraform destroy -auto-approve
+                                exit 1
+                            fi
                         '''
                     }
                 }
