@@ -337,44 +337,9 @@ spec:
                 }
             }
             agent {
-                kubernetes {
-                    cloud 'k8s-automated-dr'
-                    yaml """
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    jenkins: agent
-spec:
-  serviceAccountName: jenkins-agent
-  containers:
-  - name: jnlp
-    image: jenkins/inbound-agent:latest
-    resources:
-      requests:
-        memory: "256Mi"
-        cpu: "100m"
-      limits:
-        memory: "512Mi"
-        cpu: "500m"
-  - name: tools
-    image: freshinit/jenkins-agent-with-tools:latest
-    command: ["sleep"]
-    args: ["90d"]
-    tty: true
-    securityContext:
-      runAsUser: 1000
-      runAsGroup: 1000
-    resources:
-      requests:
-        memory: "512Mi"
-        cpu: "200m"
-      limits:
-        memory: "1Gi"
-        cpu: "1000m"
-  restartPolicy: Never
-"""
-                    defaultContainer 'tools'
+                docker {
+                    image 'freshinit/jenkins-agent-with-tools:latest'
+                    args '-u root:root'  // Run as root to avoid permission issues
                 }
             }
             options { skipDefaultCheckout() }
