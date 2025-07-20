@@ -21,6 +21,7 @@ resource "aws_s3_bucket_acl" "tf_backend_bucket_acl" {
 
 
 resource "aws_s3_bucket_ownership_controls" "tf_backend_bucket_ownership" {
+  provider = aws.remote_state
   bucket = aws_s3_bucket.tf_backend_bucket.id
 
   rule {
@@ -49,6 +50,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tf_backend_bucket
 }
 
 resource "aws_dynamodb_table" "basic-dynamodb-table" {
+  provider = aws.remote_state
   count          = var.aws_dynamodb_table_enabled ? 1 : 0
   name           = "terraform-state-lock"
   billing_mode   = "PROVISIONED"
@@ -72,6 +74,7 @@ resource "aws_dynamodb_table" "basic-dynamodb-table" {
 }
 
 resource "aws_s3_bucket_policy" "tf_backend_bucket_policy" {
-  bucket = aws_s3_bucket.tf_backend_bucket.id
-  policy = local.tf_backend_bucket_policy_json
+  provider = aws.remote_state
+  bucket   = aws_s3_bucket.tf_backend_bucket.id
+  policy   = local.tf_backend_bucket_policy_json
 }
