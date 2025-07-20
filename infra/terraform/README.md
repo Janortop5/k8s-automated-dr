@@ -36,7 +36,7 @@ terraform plan
 ```bash
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token* && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/velero bucket_name='my-velero-backups' region='us-west-2'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/velero bucket_name='velero-demo' region='us-west-2'"
 ```
 #### Run Terraform
 - Format, Validate, Initialize and run the Terraform Configuration.

@@ -2,47 +2,54 @@ data "aws_caller_identity" "current" {
   provider = aws.remote_state
 }
 
-# Data sources to check if resources exist
+# External data sources to check if resources exist
+data "external" "check_s3_bucket" {
+  count = var.check_existing_resources ? 1 : 0
+  program = ["bash", "-c", <<-EOT
+    if aws s3api head-bucket --bucket "${var.tf_state_bucket}" 2>/dev/null; then
+      echo '{"exists":"true"}'
+    else
+      echo '{"exists":"false"}'
+    fi
+  EOT
+  ]
+}
+
+data "external" "check_dynamodb_table" {
+  count = var.check_existing_resources && var.aws_dynamodb_table_enabled ? 1 : 0
+  program = ["bash", "-c", <<-EOT
+    if aws dynamodb describe-table --table-name "terraform-state-lock" 2>/dev/null; then
+      echo '{"exists":"true"}'
+    else
+      echo '{"exists":"false"}'
+    fi
+  EOT
+  ]
+}
+
+data "external" "check_s3_bucket_policy" {
+  count = var.check_existing_resources ? 1 : 0
+  program = ["bash", "-c", <<-EOT
+    if aws s3api get-bucket-policy --bucket "${var.tf_state_bucket}" 2>/dev/null; then
+      echo '{"exists":"true"}'
+    else
+      echo '{"exists":"false"}'
+    fi
+  EOT
+  ]
+}
+
+# Only fetch existing resources if they actually exist
 data "aws_s3_bucket" "existing_bucket" {
   provider = aws.remote_state
-  count    = var.check_existing_resources ? 1 : 0
+  count    = var.check_existing_resources && local.bucket_exists_check ? 1 : 0
   bucket   = var.tf_state_bucket
-  
-  # This will fail gracefully if bucket doesn't exist
-  lifecycle {
-    postcondition {
-      condition     = self.id != ""
-      error_message = "Bucket does not exist"
-    }
-  }
 }
 
 data "aws_dynamodb_table" "existing_table" {
   provider = aws.remote_state
-  count    = var.check_existing_resources && var.aws_dynamodb_table_enabled ? 1 : 0
+  count    = var.check_existing_resources && var.aws_dynamodb_table_enabled && local.table_exists_check ? 1 : 0
   name     = "terraform-state-lock"
-  
-  # This will fail gracefully if table doesn't exist
-  lifecycle {
-    postcondition {
-      condition     = self.name != ""
-      error_message = "DynamoDB table does not exist"
-    }
-  }
-}
-
-# Check if bucket policy already exists
-data "aws_s3_bucket_policy" "existing_policy" {
-  provider = aws.remote_state
-  count    = var.check_existing_resources ? 1 : 0
-  bucket   = var.tf_state_bucket
-  
-  lifecycle {
-    postcondition {
-      condition     = self.policy != ""
-      error_message = "Bucket policy does not exist"
-    }
-  }
 }
 
 data "aws_iam_policy_document" "tf_backend_bucket_policy" {
@@ -134,10 +141,15 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
 }
 
 locals {
-  # Determine if resources exist
-  bucket_exists = var.check_existing_resources ? length(data.aws_s3_bucket.existing_bucket) > 0 : false
-  table_exists  = var.check_existing_resources && var.aws_dynamodb_table_enabled ? length(data.aws_dynamodb_table.existing_table) > 0 : false
-  policy_exists = var.check_existing_resources ? length(data.aws_s3_bucket_policy.existing_policy) > 0 : false
+  # Check existence from external data sources
+  bucket_exists_check = var.check_existing_resources ? data.external.check_s3_bucket[0].result.exists == "true" : false
+  table_exists_check  = var.check_existing_resources && var.aws_dynamodb_table_enabled ? data.external.check_dynamodb_table[0].result.exists == "true" : false
+  policy_exists_check = var.check_existing_resources ? data.external.check_s3_bucket_policy[0].result.exists == "true" : false
+  
+  # Determine if resources exist (for referencing)
+  bucket_exists = local.bucket_exists_check
+  table_exists  = local.table_exists_check
+  policy_exists = local.policy_exists_check
   
   # Determine what to create
   create_bucket = !local.bucket_exists
