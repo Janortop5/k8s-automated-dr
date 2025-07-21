@@ -357,10 +357,10 @@ pipeline {
                         sh """
                             set -e  # Exit immediately on error
 
-                            export TF_VAR_aws_access_key_id=\${AWS_ACCESS_KEY}
-                            export TF_VAR_aws_secret_access_key=\${AWS_SECRET_KEY}
-                            export TF_VAR_velero_bucket_name=\${BACKUP_BUCKET}
-                            export TF_VAR_velero_aws_region=\${BACKUP_BUCKET_REGION}
+                            export TF_VAR_aws_access_key_id=${AWS_ACCESS_KEY}
+                            export TF_VAR_aws_secret_access_key=${AWS_SECRET_KEY}
+                            export TF_VAR_velero_bucket_name=${BACKUP_BUCKET}
+                            export TF_VAR_velero_aws_region=${BACKUP_BUCKET_REGION}
 
                             echo "[INFO] Setting up safe HOME directory..."
                             export HOME="\$WORKSPACE/tmp_home"
@@ -412,30 +412,3 @@ pipeline {
         failure { echo '❌ Pipeline failed' }
     }
 }
-
-// -var "private_key_path=$PEM_KEY_PATH"
-
-
-// if ! terraform apply tfplan; then
-//     echo "[ERROR] Terraform apply failed, destroying resources..."
-//     terraform destroy -auto-approve
-//     exit 1
-// fi
-// terraform destroy -auto-approve
-// if ! whoami &>/dev/null; then
-//                         echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
-//                     fi
-//    if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
-//                                 echo "[INFO] Cleaning up existing Terraform files..."
-
-//                                 # Fix whoami issue
-//                                 if ! whoami &>/dev/null; then
-//                                     echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
-//                                 fi
-
-//                                 # Fix ownership safely
-//                                 chown -R $(id -u):$(id -g) .terraform 2>/dev/null || true
-
-//                                 # Remove files/folders if present
-//                                 rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
-//                             fi
