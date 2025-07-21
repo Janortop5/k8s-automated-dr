@@ -379,7 +379,7 @@ spec:
                                 
 
                                 # Remove files/folders if present
-                                sudo rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+                                rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
                             fi
                   
 
