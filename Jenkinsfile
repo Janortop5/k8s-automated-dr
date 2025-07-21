@@ -380,65 +380,26 @@ spec:
                             echo "[INFO] Planning Terraform deployment..."
                             terraform plan -out=tfplan
 
+                                
                             # Apply the plan
-                            steps {
-    unstash 'repo-source'
-    withCredentials([
-        string(credentialsId: 'aws_access_key', variable: 'AWS_ACCESS_KEY'),
-        string(credentialsId: 'aws_secret_key', variable: 'AWS_SECRET_KEY'),
-        string(credentialsId: 'backup_bucket', variable: 'BACKUP_BUCKET'),
-        string(credentialsId: 'backup_bucket_region', variable: 'BACKUP_BUCKET_REGION')
-    ]) {
-        dir('./infra/terraform/standby_terraform') {
-            sh '''
-                set -e  # Exit immediately on error
-
-                export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
-                export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
-                export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
-                export VELERO_REGION=${BACKUP_BUCKET_REGION}
-
-                echo "[INFO] Setting up safe HOME directory..."
-                export HOME="$WORKSPACE/tmp_home"
-                mkdir -p "$HOME"
-
-                echo "[INFO] HOME set to: $HOME"
-                echo "[INFO] Current user: $(whoami 2>/dev/null || echo "UID $(id -u)")"
-
-                # Safer user handling - only add if doesn't exist
-                if ! getent passwd $(id -u) >/dev/null 2>&1; then
-                    echo "[INFO] Adding temporary user entry..."
-                    echo "jenkins:x:$(id -u):$(id -g):Jenkins:$HOME:/bin/bash" >> /etc/passwd
-                fi
-
-                echo "[INFO] Initializing Terraform..."
-                terraform init
-
-                echo "[INFO] Validating Terraform configuration..."
-                terraform validate
-
-                echo "[INFO] Planning Terraform deployment..."
-                terraform plan -out=tfplan
-
-                # Apply the plan
-                echo "[INFO] Applying Terraform plan..."
-                if terraform apply tfplan; then
-                    echo "[INFO] Terraform apply successful"
-                    
-                    # Check if user requested destruction after apply
-                    if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
-                        echo "[INFO] DESTROY_AFTER_APPLY is enabled - destroying resources..."
-                        terraform destroy -auto-approve
-                    else
-                        echo "[INFO] DESTROY_AFTER_APPLY is disabled - resources will remain deployed"
-                    fi
-                else
-                        echo "[ERROR] Terraform apply failed"
-                        echo "[INFO] Attempting to destroy any partially created resources..."
-                        terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
-                        exit 1
-                    fi
-                        '''
+                            echo "[INFO] Applying Terraform plan..."
+                            if terraform apply tfplan; then
+                                echo "[INFO] Terraform apply successful"
+                                
+                                # Check if user requested destruction after apply
+                                if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
+                                    echo "[INFO] DESTROY_AFTER_APPLY is enabled - destroying resources..."
+                                    terraform destroy -auto-approve
+                                else
+                                    echo "[INFO] DESTROY_AFTER_APPLY is disabled - resources will remain deployed"
+                                fi
+                            else
+                                    echo "[ERROR] Terraform apply failed"
+                                    echo "[INFO] Attempting to destroy any partially created resources..."
+                                    terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
+                                    exit 1
+                                fi
+                                    '''
                     }
                 }
             }
