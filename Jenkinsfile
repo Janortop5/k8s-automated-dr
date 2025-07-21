@@ -382,15 +382,6 @@ spec:
                             echo "[INFO] HOME set to: $HOME"
                             echo "[INFO] Current user:"
                             whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
-
-                            
-
-                            if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
-                                echo "[INFO] Cleaning up existing Terraform files..."
-
-                                # Remove files/folders if present
-                                rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
-                            fi
                   
 
                             echo "[INFO] Initializing Terraform..."
@@ -409,16 +400,29 @@ spec:
                                 if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
                                     echo "[INFO] DESTROY_AFTER_APPLY is enabled - destroying resources..."
                                     terraform destroy -auto-approve
+
+                                    if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
+                                        echo "[INFO] Cleaning up existing Terraform files..."
+
+                                        # Remove files/folders if present
+                                        rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+                                    fi
                                 else
                                     echo "[INFO] DESTROY_AFTER_APPLY is disabled - resources will remain deployed"
                                 fi
                             else
-                                    echo "[ERROR] Terraform apply failed"
-                                    echo "[INFO] Attempting to destroy any partially created resources..."
-                                    terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
-                                    exit 1
+                                echo "[ERROR] Terraform apply failed"
+                                echo "[INFO] Attempting to destroy any partially created resources..."
+                                terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
+                                if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
+                                    echo "[INFO] Cleaning up existing Terraform files..."
+
+                                    # Remove files/folders if present
+                                    rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
                                 fi
-                                    '''
+                                exit 1
+                            fi
+                            '''
                     }
                 }
             }
