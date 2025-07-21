@@ -357,33 +357,29 @@ pipeline {
                         sh """
                             set -e  # Exit immediately on error
 
-
-                            export TF_VAR_aws_access_key_id=${AWS_ACCESS_KEY}
-                            export TF_VAR_aws_secret_access_key=${AWS_SECRET_KEY}
-                            export TF_VAR_velero_bucket_name=${BACKUP_BUCKET}
-                            export TF_VAR_velero_aws_region=${BACKUP_BUCKET_REGION}
+                            export TF_VAR_aws_access_key_id=$\{AWS_ACCESS_KEY}
+                            export TF_VAR_aws_secret_access_key=$\{AWS_SECRET_KEY}
+                            export TF_VAR_velero_bucket_name=$\{BACKUP_BUCKET}
+                            export TF_VAR_velero_aws_region=$\{BACKUP_BUCKET_REGION}
 
                             echo "[INFO] Setting up safe HOME directory..."
-                            export HOME="$WORKSPACE/tmp_home"
-                            mkdir -p "$HOME"
+                            export HOME="\$WORKSPACE/tmp_home"
+                            mkdir -p "\$HOME"
 
-                            echo "[INFO] HOME set to: $HOME"
+                            echo "[INFO] HOME set to: \$HOME"
                             echo "[INFO] Current user:"
-                            whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
+                            whoami || echo "[WARN] Unable to resolve username for UID \$(id -u)"
 
                             if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
-
                                 # Remove files/folders if present
                                 rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
                             fi
-                  
-
+                            
                             echo "[INFO] Initializing Terraform..."
                             terraform init
 
                             echo "[INFO] Planning Terraform deployment..."
                             terraform plan -out=tfplan
-
                                 
                             # Apply the plan
                             echo "[INFO] Applying Terraform plan..."
@@ -398,12 +394,12 @@ pipeline {
                                     echo "[INFO] DESTROY_AFTER_APPLY is disabled - resources will remain deployed"
                                 fi
                             else
-                                    echo "[ERROR] Terraform apply failed"
-                                    echo "[INFO] Attempting to destroy any partially created resources..."
-                                    terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
-                                    exit 1
-                                fi
-                                    """
+                                echo "[ERROR] Terraform apply failed"
+                                echo "[INFO] Attempting to destroy any partially created resources..."
+                                terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
+                                exit 1
+                            fi
+                        """
                     }
                 }
             }
