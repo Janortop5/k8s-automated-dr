@@ -245,91 +245,91 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
-            when {
-                expression { return !params.DEPLOY_STANDBY_ONLY }
-            }
-            agent {
-                kubernetes {
-                    cloud 'k8s-automated-dr'
-                    yaml """
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    jenkins: agent
-spec:
-  serviceAccountName: jenkins-agent
-  containers:
-  - name: jnlp
-    image: jenkins/inbound-agent:latest
-    resources:
-      requests:
-        memory: "256Mi"
-        cpu: "100m"
-      limits:
-        memory: "512Mi"
-        cpu: "500m"
-  - name: kubectl
-    image: bitnami/kubectl:latest
-    command: ["sleep"]
-    args: ["99d"]
-    tty: true
-    securityContext:
-      runAsUser: 1000
-      runAsGroup: 1000
-    resources:
-      requests:
-        memory: "128Mi"
-        cpu: "50m"
-      limits:
-        memory: "256Mi"
-        cpu: "200m"
-  restartPolicy: Never
-"""
-                    defaultContainer 'kubectl'
-                }
-            }
-            options { skipDefaultCheckout() }
-            steps {
-                unstash 'repo-source'
-                container('kubectl') {
-                    sh '''
-                        echo "🔧 Applying Kubernetes manifests..."
-                        kubectl version 
-                        kubectl config view 
+//         stage('Deploy') {
+//             when {
+//                 expression { return !params.DEPLOY_STANDBY_ONLY }
+//             }
+//             agent {
+//                 kubernetes {
+//                     cloud 'k8s-automated-dr'
+//                     yaml """
+// apiVersion: v1
+// kind: Pod
+// metadata:
+//   labels:
+//     jenkins: agent
+// spec:
+//   serviceAccountName: jenkins-agent
+//   containers:
+//   - name: jnlp
+//     image: jenkins/inbound-agent:latest
+//     resources:
+//       requests:
+//         memory: "256Mi"
+//         cpu: "100m"
+//       limits:
+//         memory: "512Mi"
+//         cpu: "500m"
+//   - name: kubectl
+//     image: bitnami/kubectl:latest
+//     command: ["sleep"]
+//     args: ["99d"]
+//     tty: true
+//     securityContext:
+//       runAsUser: 1000
+//       runAsGroup: 1000
+//     resources:
+//       requests:
+//         memory: "128Mi"
+//         cpu: "50m"
+//       limits:
+//         memory: "256Mi"
+//         cpu: "200m"
+//   restartPolicy: Never
+// """
+//                     defaultContainer 'kubectl'
+//                 }
+//             }
+//             options { skipDefaultCheckout() }
+//             steps {
+//                 unstash 'repo-source'
+//                 container('kubectl') {
+//                     sh '''
+//                         echo "🔧 Applying Kubernetes manifests..."
+//                         kubectl version 
+//                         kubectl config view 
                         
-                        # Check if we can connect to the cluster
-                        if ! kubectl get nodes; then
-                            echo "❌ Cannot connect to Kubernetes cluster"
-                            exit 1
-                        fi
+//                         # Check if we can connect to the cluster
+//                         if ! kubectl get nodes; then
+//                             echo "❌ Cannot connect to Kubernetes cluster"
+//                             exit 1
+//                         fi
                         
-                        # Check if Chaos Mesh CRDs are available
-                        if kubectl api-resources | grep -q "stresschaos"; then
-                            echo "▶️  Applying Chaos Mesh experiments"
-                            kubectl apply -R -f k8s-manifests/ --validate=false
-                        else
-                            echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
-                            # Apply non-chaos manifests only
-                            find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
-                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "$file"; then
-                                    kubectl apply -f "$file"
-                                fi
-                            done
-                        fi
-                    '''
-                }
-            }
-            post {
-                success {
-                    echo '✅ Kubernetes manifests applied successfully.'
-                }
-                failure {
-                    echo '❌ Failed to apply Kubernetes manifests'
-                }
-            }
-        }
+//                         # Check if Chaos Mesh CRDs are available
+//                         if kubectl api-resources | grep -q "stresschaos"; then
+//                             echo "▶️  Applying Chaos Mesh experiments"
+//                             kubectl apply -R -f k8s-manifests/ --validate=false
+//                         else
+//                             echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
+//                             # Apply non-chaos manifests only
+//                             find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
+//                                 if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "$file"; then
+//                                     kubectl apply -f "$file"
+//                                 fi
+//                             done
+//                         fi
+//                     '''
+//                 }
+//             }
+//             post {
+//                 success {
+//                     echo '✅ Kubernetes manifests applied successfully.'
+//                 }
+//                 failure {
+//                     echo '❌ Failed to apply Kubernetes manifests'
+//                 }
+//             }
+//         }
         
         stage('Deploy Standby Terraform') {
             when {
