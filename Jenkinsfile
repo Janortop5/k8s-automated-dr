@@ -357,14 +357,6 @@ spec:
                         sh '''
                             set -e  # Exit immediately on error
 
-                            # Fix whoami issue
-                            if ! whoami &>/dev/null; then
-                                echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
-                            fi
-
-                            # Fix ownership safely
-                            chown -R $(id -u):$(id -g) .terraform 2>/dev/null || true
-
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
                             export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
@@ -382,6 +374,13 @@ spec:
                             echo "[INFO] HOME set to: $HOME"
                             echo "[INFO] Current user:"
                             whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
+
+                            if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
+                                
+
+                                # Remove files/folders if present
+                                sudo rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+                            fi
                   
 
                             echo "[INFO] Initializing Terraform..."
@@ -400,29 +399,16 @@ spec:
                                 if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
                                     echo "[INFO] DESTROY_AFTER_APPLY is enabled - destroying resources..."
                                     terraform destroy -auto-approve
-
-                                    if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
-                                        echo "[INFO] Cleaning up existing Terraform files..."
-
-                                        # Remove files/folders if present
-                                        rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
-                                    fi
                                 else
                                     echo "[INFO] DESTROY_AFTER_APPLY is disabled - resources will remain deployed"
                                 fi
                             else
-                                echo "[ERROR] Terraform apply failed"
-                                echo "[INFO] Attempting to destroy any partially created resources..."
-                                terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
-                                if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
-                                    echo "[INFO] Cleaning up existing Terraform files..."
-
-                                    # Remove files/folders if present
-                                    rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+                                    echo "[ERROR] Terraform apply failed"
+                                    echo "[INFO] Attempting to destroy any partially created resources..."
+                                    terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
+                                    exit 1
                                 fi
-                                exit 1
-                            fi
-                            '''
+                                    '''
                     }
                 }
             }
@@ -448,3 +434,17 @@ spec:
 // if ! whoami &>/dev/null; then
 //                         echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
 //                     fi
+//    if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
+//                                 echo "[INFO] Cleaning up existing Terraform files..."
+
+//                                 # Fix whoami issue
+//                                 if ! whoami &>/dev/null; then
+//                                     echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
+//                                 fi
+
+//                                 # Fix ownership safely
+//                                 chown -R $(id -u):$(id -g) .terraform 2>/dev/null || true
+
+//                                 # Remove files/folders if present
+//                                 rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+//                             fi
