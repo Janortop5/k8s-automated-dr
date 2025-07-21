@@ -381,7 +381,6 @@ spec:
                             whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
 
                             if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
-                                
 
                                 # Remove files/folders if present
                                 rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
