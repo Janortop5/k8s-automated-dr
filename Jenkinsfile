@@ -362,6 +362,11 @@ spec:
                             export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
                             export VELERO_REGION=${BACKUP_BUCKET_REGION}
 
+                            export aws_access_key_id=${AWS_ACCESS_KEY}
+                            export aws_secret_access_key=${AWS_SECRET_KEY}
+                            export velero_bucket_name=${BACKUP_BUCKET}
+                            export velero_aws_region=${BACKUP_BUCKET_REGION}
+
                             echo "[INFO] Setting up safe HOME directory..."
                             export HOME="$WORKSPACE/tmp_home"
                             mkdir -p "$HOME"
