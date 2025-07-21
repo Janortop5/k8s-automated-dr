@@ -357,6 +357,14 @@ spec:
                         sh '''
                             set -e  # Exit immediately on error
 
+                            # Fix whoami issue
+                            if ! whoami &>/dev/null; then
+                                echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
+                            fi
+
+                            # Fix ownership safely
+                            chown -R $(id -u):$(id -g) .terraform 2>/dev/null || true
+
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
                             export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
@@ -375,16 +383,10 @@ spec:
                             echo "[INFO] Current user:"
                             whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
 
+                            
+
                             if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
                                 echo "[INFO] Cleaning up existing Terraform files..."
-
-                                # Fix whoami issue
-                                if ! whoami &>/dev/null; then
-                                    echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
-                                fi
-
-                                # Fix ownership safely
-                                chown -R $(id -u):$(id -g) .terraform 2>/dev/null || true
 
                                 # Remove files/folders if present
                                 rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
