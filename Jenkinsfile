@@ -354,18 +354,9 @@ pipeline {
                     string(credentialsId: 'backup_bucket_region', variable: 'BACKUP_BUCKET_REGION')
                 ]) {
                     dir('./infra/terraform/standby_terraform') {
-                        sh '''
+                        sh """
                             set -e  # Exit immediately on error
 
-                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
-                            export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
-                            export VELERO_REGION=${BACKUP_BUCKET_REGION}
-
-                            export aws_access_key_id=${AWS_ACCESS_KEY}
-                            export aws_secret_access_key=${AWS_SECRET_KEY}
-                            export velero_bucket_name=${BACKUP_BUCKET}
-                            export velero_aws_region=${BACKUP_BUCKET_REGION}
 
                             export TF_VAR_aws_access_key_id=${AWS_ACCESS_KEY}
                             export TF_VAR_aws_secret_access_key=${AWS_SECRET_KEY}
@@ -412,7 +403,7 @@ pipeline {
                                     terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
                                     exit 1
                                 fi
-                                    '''
+                                    """
                     }
                 }
             }
