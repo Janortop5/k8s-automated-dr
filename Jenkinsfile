@@ -370,9 +370,21 @@ spec:
                             echo "[INFO] Current user:"
                             whoami || echo "[WARN] Unable to resolve username for UID $(id -u)"
 
-                            if ! whoami &>/dev/null; then
-                                echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
+                            if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
+                                echo "[INFO] Cleaning up existing Terraform files..."
+
+                                # Fix whoami issue
+                                if ! whoami &>/dev/null; then
+                                    echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
+                                fi
+
+                                # Fix ownership safely
+                                chown -R $(id -u):$(id -g) .terraform 2>/dev/null || true
+
+                                # Remove files/folders if present
+                                rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
                             fi
+                  
 
                             echo "[INFO] Initializing Terraform..."
                             terraform init
@@ -422,3 +434,6 @@ spec:
 //     exit 1
 // fi
 // terraform destroy -auto-approve
+// if ! whoami &>/dev/null; then
+//                         echo "jenkins:x:$(id -u):$(id -g):Jenkins:/home/jenkins:/bin/bash" >> /etc/passwd
+//                     fi
