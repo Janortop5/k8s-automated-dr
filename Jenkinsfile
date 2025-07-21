@@ -358,7 +358,7 @@ spec:
 
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
                             export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS}
-                            export VELERO_BUCKET_NAME=${BUCKET_NAME}
+                            export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
                             export VELERO_REGION=${BACKUP_BUCKET_REGION}
 
                             echo "[INFO] Setting up safe HOME directory..."
