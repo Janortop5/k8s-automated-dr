@@ -357,7 +357,7 @@ spec:
                             set -e  # Exit immediately on error
 
                             export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS}
+                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
                             export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
                             export VELERO_REGION=${BACKUP_BUCKET_REGION}
 
