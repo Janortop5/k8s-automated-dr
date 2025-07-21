@@ -224,6 +224,7 @@ pipeline {
     
     parameters {
         booleanParam(name: 'DEPLOY_STANDBY_ONLY', defaultValue: false, description: 'Deploy only standby environment')
+        booleanParam(name: 'DESTROY_AFTER_APPLY', defaultValue: false, description: 'Destroy resources after apply')
         booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip test stages')
     }
 
@@ -379,12 +380,22 @@ spec:
                             echo "[INFO] Planning Terraform deployment..."
                             terraform plan -out=tfplan
 
-                            if ! terraform apply tfplan; then
-                                echo "[ERROR] Terraform apply failed, destroying resources..."
-                                terraform destroy -auto-approve
+                            # Apply the plan
+                            echo "[INFO] Applying Terraform plan..."
+                            if terraform apply tfplan; then
+                                echo "[INFO] Terraform apply successful"
+                                
+                                # Only destroy if this is a test environment or if DESTROY_AFTER_APPLY is set
+                                if [ "${DESTROY_AFTER_APPLY:-false}" = "true" ]; then
+                                    echo "[INFO] Destroying resources as requested..."
+                                    terraform destroy -auto-approve
+                                fi
+                            else
+                                echo "[ERROR] Terraform apply failed"
+                                echo "[INFO] Attempting to destroy any partially created resources..."
+                                terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
                                 exit 1
                             fi
-                            terraform destroy -auto-approve
                         '''
                     }
                 }
@@ -400,3 +411,11 @@ spec:
 }
 
 // -var "private_key_path=$PEM_KEY_PATH"
+
+
+// if ! terraform apply tfplan; then
+//     echo "[ERROR] Terraform apply failed, destroying resources..."
+//     terraform destroy -auto-approve
+//     exit 1
+// fi
+// terraform destroy -auto-approve
