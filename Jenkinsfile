@@ -144,6 +144,11 @@ pipeline {
                             export TF_VAR_velero_bucket_name=${BACKUP_BUCKET}
                             export TF_VAR_velero_aws_region=${BACKUP_BUCKET_REGION}
 
+                            if [ -z "\${AWS_ACCESS_KEY}" ] || [ -z "\${AWS_SECRET_KEY}" ]; then
+                                echo "[ERROR] AWS credentials not provided"
+                                exit 1
+                            fi
+
                             echo "[INFO] Setting up safe HOME directory..."
                             export HOME="\$WORKSPACE/tmp_home"
                             mkdir -p "\$HOME"
