@@ -1,5 +1,5 @@
 velero_aws_access_key: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
 velero_aws_secret_key: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
 velero_bucket_name: "{{ lookup('env', 'VELERO_BUCKET_NAME') }}"
-velero_aws_region: "{{ lookup('env', 'VELERO__REGION') }}"
+velero_aws_region: "{{ lookup('env', 'VELERO_REGION') }}"
 velero_version: "1.16.1"
