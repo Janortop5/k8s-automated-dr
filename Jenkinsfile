@@ -181,6 +181,7 @@ pipeline {
                                 # Check if user requested destruction after apply
                                 if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
                                     echo "[INFO] DESTROY_AFTER_APPLY is enabled - destroying resources..."
+                                    sleep 900 && echo "15 minutes elapsed!"
                                     terraform destroy -auto-approve
                                 else
                                     echo "[INFO] DESTROY_AFTER_APPLY is disabled - resources will remain deployed"
