@@ -30,6 +30,12 @@ spec:
           value: "1"   # number of data points for LSTM
         - name: USE_TIME_SERIES
           value: "false"  # true for time series, false for single point collection
+        - name: ALERT_COOLDOWN_SECONDS
+          value: "900"  # 5 minutes
+        - name: API_GATEWAY_URL
+          value: "https://74t9069cw1.execute-api.us-west-1.amazonaws.com/prod/trigger"  # API Gateway URL for deployment trigger
+        - name: ALERT_CPU_THRESHOLD
+          value: "30"  # CPU usage threshold for alerting
         # Authentication (uncomment if needed)
         # - name: PROMETHEUS_AUTH_TOKEN
         #   valueFrom:
