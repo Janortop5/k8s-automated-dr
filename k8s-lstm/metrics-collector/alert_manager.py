@@ -3,6 +3,8 @@ import os
 from typing import List, Dict
 import requests
 from datetime import datetime
+import requests
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -31,7 +33,7 @@ class AlertManager:
             os.getenv(
                 'ALERT_COOLDOWN_SECONDS',
                 '300'))  # 5 minutes
-
+        self.api_gateway_url = os.getenv('API_GATEWAY_URL')
         # Track last alert times to prevent alert flooding
         self.last_alert_times: Dict[str, datetime] = {}
 
@@ -43,6 +45,29 @@ class AlertManager:
         time_since_last_alert = datetime.now(
         ) - self.last_alert_times[metric_name]
         return time_since_last_alert.total_seconds() < self.alert_cooldown
+
+    def trigger_deployment(self):
+        """Trigger deployment via external API"""
+        logger.info("Triggering deployment...")
+        headers = {
+            "Content-Type": "application/json"
+        }
+        data = {
+            "parameters": {
+                "deploy_standby_only": "true",
+                "destroy_after_apply": "false",
+                "skip_tests": "false"
+            }
+        }
+
+        try:
+            response = requests.post(self.api_gateway_url, headers=headers, json=data, timeout=10)
+            if response.status_code == 200:
+                logger.info("Triggered deployment successfully")
+            else:
+                logger.error(f"Deployment trigger failed: {response.status_code} {response.text}")
+        except Exception as e:
+            logger.exception("Exception occurred while triggering deployment")
 
     def _update_last_alert_time(self, metric_name: str):
         """Update the last alert time for a specific metric"""
@@ -105,6 +130,8 @@ class AlertManager:
         if alerts:
             logger.warning(f"Sending alerts: {alerts}")
             self._send_alert(alerts)
+            if self.api_gateway_url:
+                self.trigger_deployment()
 
         return alerts
 
