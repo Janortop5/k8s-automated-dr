@@ -40,3 +40,9 @@ variable "check_existing_resources" {
   type        = bool
   default     = true
 }
+
+variable "aws_region" {
+  description = "The AWS region to use for resources"
+  type        = string
+  
+}

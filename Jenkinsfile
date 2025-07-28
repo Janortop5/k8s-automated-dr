@@ -264,3 +264,89 @@ pipeline {
         failure { echo '❌ Pipeline failed' }
     }
 }
+
+def processRedisQueue() {
+    // Use Redis CLI or Jenkins Redis plugin
+    def queueScript = '''
+    import redis
+    import json
+    import time
+    import subprocess
+    import sys
+    
+    def process_dr_queue():
+        r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+        
+        while True:
+            try:
+                # Blocking pop from queue (30 second timeout)
+                job_data = r.brpop('dr-queue', timeout=30)
+                
+                if job_data:
+                    queue_name, job_json = job_data
+                    job = json.loads(job_json)
+                    
+                    print(f"Processing DR job: {job['id']}")
+                    
+                    # Move to processing queue
+                    r.lpush('dr-processing', job_json)
+                    
+                    # Trigger the actual Jenkins job with parameters
+                    trigger_jenkins_job(job)
+                    
+                    # Remove from processing queue when done
+                    r.lrem('dr-processing', 1, job_json)
+                    
+                else:
+                    print("No jobs in queue, continuing to poll...")
+                    
+            except Exception as e:
+                print(f"Error processing queue: {e}")
+                time.sleep(5)  # Wait before retrying
+    
+    def trigger_jenkins_job(job):
+        """
+        Trigger the actual DR Jenkins job with parameters
+        """
+        pipeline_name = job['pipeline_name']
+        branch_name = job['branch_name']
+        parameters = job['parameters']
+        
+        # Build Jenkins CLI command
+        cmd = [
+            'java', '-jar', '/var/jenkins_home/jenkins-cli.jar',
+            '-s', 'http://localhost:8080',
+            '-auth', f"${env.JENKINS_USER}:${env.JENKINS_API_TOKEN}",
+            'build', f"{pipeline_name}/{branch_name}",
+            '-p', f"DEPLOY_STANDBY_ONLY={parameters['DEPLOY_STANDBY_ONLY']}",
+            '-p', f"DESTROY_AFTER_APPLY={parameters['DESTROY_AFTER_APPLY']}",
+            '-p', f"SKIP_TESTS={parameters['SKIP_TESTS']}",
+            '-p', f"TRIGGERED_BY=redis-queue",
+            '-p', f"JOB_ID={job['id']}"
+        ]
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                print(f"Successfully triggered job {job['id']}")
+            else:
+                print(f"Failed to trigger job {job['id']}: {result.stderr}")
+                
+        except subprocess.TimeoutExpired:
+            print(f"Timeout triggering job {job['id']}")
+        except Exception as e:
+            print(f"Error triggering job {job['id']}: {e}")
+    
+    if __name__ == "__main__":
+        process_dr_queue()
+    '''
+    
+    // Write the script to a file and execute it
+    writeFile file: 'process_queue.py', text: queueScript
+    
+    // Execute the queue processor
+    sh '''
+        python3 process_queue.py
+    '''
+}

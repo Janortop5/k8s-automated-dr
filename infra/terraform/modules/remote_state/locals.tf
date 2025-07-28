@@ -2,12 +2,16 @@ data "aws_caller_identity" "current" {
   provider = aws.remote_state
 }
 
-# External data sources to check if resources exist
+# Robust external data sources with proper error handling
 data "external" "check_s3_bucket" {
   count = var.check_existing_resources ? 1 : 0
   program = ["bash", "-c", <<-EOT
-    if aws s3api head-bucket --bucket "${var.tf_state_bucket}" 2>/dev/null; then
-      echo '{"exists":"true"}'
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Redirect all AWS CLI output to stderr to avoid JSON contamination
+    if aws s3api head-bucket --bucket "${var.tf_state_bucket}" --region "${var.aws_region}" >/dev/null 2>&1; then
+      echo '{"exists":"true"}' 
     else
       echo '{"exists":"false"}'
     fi
@@ -18,7 +22,11 @@ data "external" "check_s3_bucket" {
 data "external" "check_dynamodb_table" {
   count = var.check_existing_resources && var.aws_dynamodb_table_enabled ? 1 : 0
   program = ["bash", "-c", <<-EOT
-    if aws dynamodb describe-table --table-name "terraform-state-lock" 2>/dev/null; then
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Redirect all AWS CLI output to stderr to avoid JSON contamination
+    if aws dynamodb describe-table --table-name "terraform-state-lock" --region "${var.aws_region}" >/dev/null 2>&1; then
       echo '{"exists":"true"}'
     else
       echo '{"exists":"false"}'
@@ -30,7 +38,11 @@ data "external" "check_dynamodb_table" {
 data "external" "check_s3_bucket_policy" {
   count = var.check_existing_resources ? 1 : 0
   program = ["bash", "-c", <<-EOT
-    if aws s3api get-bucket-policy --bucket "${var.tf_state_bucket}" 2>/dev/null; then
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Redirect all AWS CLI output to stderr to avoid JSON contamination
+    if aws s3api get-bucket-policy --bucket "${var.tf_state_bucket}" --region "${var.aws_region}" >/dev/null 2>&1; then
       echo '{"exists":"true"}'
     else
       echo '{"exists":"false"}'
@@ -39,21 +51,23 @@ data "external" "check_s3_bucket_policy" {
   ]
 }
 
-# Only fetch existing resources if they actually exist
+# Reference existing resources only when they exist
 data "aws_s3_bucket" "existing_bucket" {
   provider = aws.remote_state
-  count    = var.check_existing_resources && local.bucket_exists_check ? 1 : 0
+  count    = var.check_existing_resources && local.bucket_exists ? 1 : 0
   bucket   = var.tf_state_bucket
 }
 
 data "aws_dynamodb_table" "existing_table" {
   provider = aws.remote_state
-  count    = var.check_existing_resources && var.aws_dynamodb_table_enabled && local.table_exists_check ? 1 : 0
+  count    = var.check_existing_resources && var.aws_dynamodb_table_enabled && local.table_exists ? 1 : 0
   name     = "terraform-state-lock"
 }
 
+# IAM Policy Document for S3 bucket
 data "aws_iam_policy_document" "tf_backend_bucket_policy" {
   provider = aws.remote_state
+  
   # Allow authenticated access for the current account
   statement {
     sid    = "AllowAuthenticatedAccess"
@@ -74,8 +88,8 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
     ]
 
     resources = [
-      local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn,
-      "${local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn}/*"
+      local.bucket_arn,
+      "${local.bucket_arn}/*"
     ]
 
     principals {
@@ -94,8 +108,8 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
     ]
 
     resources = [
-      "${local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn}/*",
-      local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn
+      "${local.bucket_arn}/*",
+      local.bucket_arn
     ]
 
     condition {
@@ -121,7 +135,7 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
     ]
 
     resources = [
-      "${local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].arn : aws_s3_bucket.tf_backend_bucket[0].arn}/*",
+      "${local.bucket_arn}/*",
     ]
 
     condition {
@@ -141,24 +155,75 @@ data "aws_iam_policy_document" "tf_backend_bucket_policy" {
 }
 
 locals {
-  # Check existence from external data sources
-  bucket_exists_check = var.check_existing_resources ? data.external.check_s3_bucket[0].result.exists == "true" : false
-  table_exists_check  = var.check_existing_resources && var.aws_dynamodb_table_enabled ? data.external.check_dynamodb_table[0].result.exists == "true" : false
-  policy_exists_check = var.check_existing_resources ? data.external.check_s3_bucket_policy[0].result.exists == "true" : false
+  # Safely extract existence information from external data sources
+  bucket_exists = var.check_existing_resources ? (
+    length(data.external.check_s3_bucket) > 0 ? 
+    lookup(data.external.check_s3_bucket[0].result, "exists", "false") == "true" : false
+  ) : false
   
-  # Determine if resources exist (for referencing)
-  bucket_exists = local.bucket_exists_check
-  table_exists  = local.table_exists_check
-  policy_exists = local.policy_exists_check
+  table_exists = var.check_existing_resources && var.aws_dynamodb_table_enabled ? (
+    length(data.external.check_dynamodb_table) > 0 ? 
+    lookup(data.external.check_dynamodb_table[0].result, "exists", "false") == "true" : false
+  ) : false
   
-  # Determine what to create
-  create_bucket = !local.bucket_exists
-  create_table  = var.aws_dynamodb_table_enabled && !local.table_exists
-  create_policy = !local.policy_exists
+  policy_exists = var.check_existing_resources ? (
+    length(data.external.check_s3_bucket_policy) > 0 ? 
+    lookup(data.external.check_s3_bucket_policy[0].result, "exists", "false") == "true" : false
+  ) : false
   
-  # Bucket ID reference (existing or new)
-  bucket_id = local.bucket_exists ? data.aws_s3_bucket.existing_bucket[0].id : aws_s3_bucket.tf_backend_bucket[0].id
+  # Determine what resources to create
+  create_bucket = var.check_existing_resources ? !local.bucket_exists : true
+  create_table  = var.aws_dynamodb_table_enabled && (var.check_existing_resources ? !local.table_exists : true)
+  create_policy = var.check_existing_resources ? !local.policy_exists : true
+  
+  # Resource references with fallbacks
+  bucket_id = local.bucket_exists && length(data.aws_s3_bucket.existing_bucket) > 0 ? (
+    data.aws_s3_bucket.existing_bucket[0].id
+  ) : (
+    local.create_bucket && length(aws_s3_bucket.tf_backend_bucket) > 0 ? 
+    aws_s3_bucket.tf_backend_bucket[0].id : var.tf_state_bucket
+  )
+  
+  bucket_arn = local.bucket_exists && length(data.aws_s3_bucket.existing_bucket) > 0 ? (
+    data.aws_s3_bucket.existing_bucket[0].arn
+  ) : (
+    local.create_bucket && length(aws_s3_bucket.tf_backend_bucket) > 0 ? 
+    aws_s3_bucket.tf_backend_bucket[0].arn : "arn:aws:s3:::${var.tf_state_bucket}"
+  )
+  
+  # Table references
+  table_name = local.table_exists && length(data.aws_dynamodb_table.existing_table) > 0 ? (
+    data.aws_dynamodb_table.existing_table[0].name
+  ) : (
+    local.create_table && length(aws_dynamodb_table.basic-dynamodb-table) > 0 ? 
+    aws_dynamodb_table.basic-dynamodb-table[0].name : "terraform-state-lock"
+  )
+  
+  table_arn = local.table_exists && length(data.aws_dynamodb_table.existing_table) > 0 ? (
+    data.aws_dynamodb_table.existing_table[0].arn
+  ) : (
+    local.create_table && length(aws_dynamodb_table.basic-dynamodb-table) > 0 ? 
+    aws_dynamodb_table.basic-dynamodb-table[0].arn : 
+    "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/terraform-state-lock"
+  )
   
   # Policy JSON
   tf_backend_bucket_policy_json = data.aws_iam_policy_document.tf_backend_bucket_policy.json
+  
+  # Debug information (shows exactly what's happening)
+  debug_info = {
+    check_existing_resources    = var.check_existing_resources
+    aws_dynamodb_table_enabled = var.aws_dynamodb_table_enabled
+    external_bucket_result     = var.check_existing_resources && length(data.external.check_s3_bucket) > 0 ? data.external.check_s3_bucket[0].result : {}
+    external_table_result      = var.check_existing_resources && var.aws_dynamodb_table_enabled && length(data.external.check_dynamodb_table) > 0 ? data.external.check_dynamodb_table[0].result : {}
+    external_policy_result     = var.check_existing_resources && length(data.external.check_s3_bucket_policy) > 0 ? data.external.check_s3_bucket_policy[0].result : {}
+    bucket_exists              = local.bucket_exists
+    table_exists               = local.table_exists
+    policy_exists              = local.policy_exists
+    create_bucket              = local.create_bucket
+    create_table               = local.create_table
+    create_policy              = local.create_policy
+    bucket_id                  = local.bucket_id
+    table_name                 = local.table_name
+  }
 }

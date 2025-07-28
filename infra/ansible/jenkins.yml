@@ -4,6 +4,8 @@
   gather_facts: true
   vars_files:
     - host_vars/jenkins-ci.yml
+    - group_vars/secrets.yml
+    - group_vars/all.yml
 
   tasks:
   - name: Install Jenkins
@@ -19,6 +21,11 @@
   - name: Install Docker
     import_tasks: tasks/install_docker.yml
     tags: docker
+    when: "'jenkins-server' in group_names"
+
+  - name: Setup Vault Development Container
+    import_tasks: tasks/setup_vault.yml
+    tags: vault
     when: "'jenkins-server' in group_names"
 
   handlers:

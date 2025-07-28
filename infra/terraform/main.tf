@@ -21,6 +21,7 @@ module "remote_state" {
   tf_state_bucket = "k8s-automated-dr"
   tf_state_key    = "standby/terraform.tfstate"
   tf_state_table  = "terraform-state-lock"
+  aws_region      = var.remote_state_bucket_region
 
   providers = {
     aws.remote_state = aws.remote_state # -> THIS REGION MUST MATCH THE STANDBY TERRAFORM MODULE REGION

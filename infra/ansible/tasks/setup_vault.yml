@@ -1,0 +1,53 @@
+- name: Run vault container
+  shell: |
+    docker run -dit --cap-add=IPC_LOCK \
+      -e 'VAULT_DEV_ROOT_TOKEN_ID={{ remote_vault_token }}' \
+      --name 'tf_vault' \
+      -p 8200:8200 \
+      hashicorp/vault:latest
+  register: vault_start
+  failed_when: vault_start.rc != 0 and "already in use" not in vault_start.stderr
+
+- name: Wait for Vault to initialize
+  pause:
+    seconds: 5
+
+- name: Set environment variables
+  shell: |
+    export TF_VAR_vault_address='{{ remote_vault_address }}'
+    export TF_VAR_vault_token='{{ remote_vault_token }}'
+    export TF_LOG=DEBUG
+
+- name: Store test credentials
+  shell: |
+    docker exec tf_vault sh -c "
+    export VAULT_ADDR='{{ remote_vault_address }}' && 
+    vault login {{ remote_vault_token }} && 
+    vault kv put secret/test username='test_user' password='1234'
+    "
+  register: test_result
+
+- name: Store AWS credentials
+  shell: |
+    docker exec tf_vault sh -c "
+    export VAULT_ADDR='{{ remote_vault_address }}' && 
+    vault login {{ remote_vault_token }} && 
+    vault kv put secret/aws access_key='{{ aws_access_key_id }}' secret_key='{{ aws_secret_access_key }}'
+    "
+  register: aws_result
+
+- name: Store Velero configuration
+  shell: |
+    docker exec tf_vault sh -c "
+    export VAULT_ADDR='{{ remote_vault_address }}' && 
+    vault login {{ remote_vault_token }} && 
+    vault kv put secret/velero bucket_name='{{ velero_bucket_name }}' region='{{ velero_region }}'
+    "
+  register: velero_result
+
+- name: Display setup status
+  debug:
+    msg: 
+      - "Vault container setup complete"
+      - "Access: {{ remote_vault_address }}"
+      - "Token: {{ remote_vault_token }}"
