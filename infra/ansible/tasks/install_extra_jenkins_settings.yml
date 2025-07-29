@@ -196,6 +196,121 @@
   delay: 15
   until: jstat.status == 200
 
+- name: Write Groovy script to create Jenkins user
+  copy:
+    dest: /tmp/create_user.groovy
+    content: |
+      import jenkins.model.*
+      import hudson.security.*
+
+      def instance = Jenkins.getInstance()
+      def hudsonRealm = instance.getSecurityRealm()
+
+      hudsonRealm.createAccount("{{ jenkins_username }}", "{{ jenkins_password }}")
+      instance.save()
+
+- name: Download Jenkins CLI jar
+  get_url:
+    url: "http://localhost:8080/jnlpJars/jenkins-cli.jar"
+    dest: "/tmp/jenkins-cli.jar"
+    mode: '0755'
+
+- name: Create Jenkins user via CLI using initial admin password
+  shell: >
+    java -jar /tmp/jenkins-cli.jar
+    -s http://localhost:8080
+    -auth admin:{{ jenkins_admin_password }}
+    groovy = < /tmp/create_user.groovy
+  args:
+    executable: /bin/bash
+
+
+- name: Write Groovy script to generate Jenkins API token
+  copy:
+    dest: /tmp/create_token.groovy
+    content: |
+      import jenkins.model.*
+      import hudson.model.*
+      import jenkins.security.*
+      import hudson.security.*
+      import com.cloudbees.plugins.credentials.*
+      import com.cloudbees.plugins.credentials.domains.*
+      import jenkins.security.apitoken.*
+
+      def user = User.get('{{ jenkins_username }}', false)
+      def apiTokenProperty = user.getProperty(ApiTokenProperty.class)
+
+      def result = apiTokenProperty.tokenStore.generateNewToken('{{ jenkins_token_name }}')
+      user.save()
+      println(result.plainValue)
+
+- name: Generate API token via Jenkins CLI
+  shell: >
+    java -jar /tmp/jenkins-cli.jar
+    -s http://localhost:8080
+    -auth {{ jenkins_username }}:{{ jenkins_password }}
+    groovy = < /tmp/create_token.groovy
+  args:
+    executable: /bin/bash
+  register: jenkins_token_output
+  changed_when: true
+
+- name: Set API token as fact
+  set_fact:
+    jenkins_api_token: "{{ jenkins_token_output.stdout | trim }}"
+
+- name: Get Git credentials from TF Vault
+  uri:
+    url: "{{ remote_vault_address }}/v1/secret/data/git_credentials"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ remote_vault_token }}"
+    return_content: yes
+  register: vault_response
+
+- name: Set credentials as fact for use in next task
+  ansible.builtin.set_fact:
+    git_username: "{{ vault_response.json.data.data.git_username }}"
+    git_password: "{{ vault_response.json.data.data.git_password }}"
+
+- name: Get Jenkins crumb
+  uri:
+    url: "https://{{ jenkins_live_domain }}/crumbIssuer/api/json"
+    method: GET
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+  register: jenkins_crumb
+
+- name: Execute Groovy script via REST API
+  uri:
+    url: "https://{{ jenkins_live_domain }}/scriptText"
+    method: POST
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+    headers:
+      Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
+    body_format: form-urlencoded
+    body:
+      script: |
+        import com.cloudbees.plugins.credentials.*
+        import com.cloudbees.plugins.credentials.domains.*
+        import com.cloudbees.plugins.credentials.impl.*
+        import jenkins.model.*
+
+        def username = "{{ git_username }}"
+        def password = "{{ git_password }}"
+        def description = "Git credentials from Vault"
+        def id = "git-credentials"
+
+        def credentials = new UsernamePasswordCredentialsImpl(
+          CredentialsScope.GLOBAL, id, description, username, password
+        )
+
+        SystemCredentialsProvider.getInstance().getStore().addCredentials(Domain.global(), credentials)
+        println("Credentials created successfully")
+
 # ---------------------------------------------------------------------------
 # 7.  Install required Jenkins plugins
 # ---------------------------------------------------------------------------

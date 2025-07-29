@@ -1,8 +1,14 @@
 pipeline {
     agent any
+    
     options {
         timestamps()
+        // Remove build retention for queue-triggered jobs
+        buildDiscarder(logRotator(numToKeepStr: '50'))
     }
+
+    // Remove SCM polling - triggers come from webhooks only
+    // triggers { pollSCM('H/0.5 * * * *') }
     
     parameters {
         booleanParam(name: 'DEPLOY_STANDBY_ONLY', defaultValue: false, description: 'Deploy only standby environment')
@@ -19,334 +25,330 @@ pipeline {
     }
 
     stages {
-        stage('Prepare') {
+        stage('Initialize') {
             steps {
+                script {
+                    // Log the job trigger source and parameters
+                    echo "🚀 DR Pipeline Started"
+                    echo "Parameters received:"
+                    echo "  DEPLOY_STANDBY_ONLY: ${params.DEPLOY_STANDBY_ONLY}"
+                    echo "  DESTROY_AFTER_APPLY: ${params.DESTROY_AFTER_APPLY}"
+                    echo "  SKIP_TESTS: ${params.SKIP_TESTS}"
+                    
+                    // Update job status in Redis (optional tracking)
+                    updateJobStatus('started')
+                }
+                
                 cleanWs()
                 checkout scm
                 stash name: 'repo-source', includes: '**'
             }
         }
 
-        // /* 2. Lint inside a Python container                       */
-        // stage('Lint') {
-        //     agent {
-        //         docker { image 'python:3.11-bullseye'; args  '-u 0:0' }   // ← run as root:root inside the container
-                         
-        //     }
-        //     steps {
-        //         sh '''
-        //             # 1. Lightweight virtual environment (lives in workspace, removed by cleanWs())
-        //             python -m venv .venv
-        //             . .venv/bin/activate
+        stage('Lint') {
+            when {
+                not { params.SKIP_TESTS }
+            }
+            agent {
+                docker { 
+                    image 'python:3.11-bullseye'
+                    args '-u 0:0'
+                }   
+            }
+            steps {
+                unstash 'repo-source'
+                sh '''
+                    # Lightweight virtual environment
+                    python -m venv .venv
+                    . .venv/bin/activate
 
-        //             # 2. Tools we need
-        //             pip install --upgrade pip nbqa flake8 autopep8 nbstripout
+                    # Install tools
+                    pip install --upgrade pip nbqa flake8 autopep8 nbstripout
 
-        //             # 3. Auto-format whitespace first
-        //             nbqa autopep8 --in-place --aggressive --aggressive k8s-lstm/notebook/lstm-disaster-recovery.ipynb
-        //             autopep8  --in-place --recursive --aggressive --aggressive k8s-lstm/
+                    # Auto-format whitespace first
+                    nbqa autopep8 --in-place --aggressive --aggressive k8s-lstm/notebook/lstm-disaster-recovery.ipynb
+                    autopep8 --in-place --recursive --aggressive --aggressive k8s-lstm/
 
-        //             # 4. strip notebook outputs **in-place**
-        //             # strip a single notebook
-        //             nbstripout k8s-lstm/notebook/lstm-disaster-recovery.ipynb
-        //             # strip every notebook under k8s-lstm/
-        //             # find k8s-lstm -name '*.ipynb' -exec nbstripout {} +
+                    # Strip notebook outputs
+                    nbstripout k8s-lstm/notebook/lstm-disaster-recovery.ipynb
 
-        //             # 5. lint the final artefacts
-        //             nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
-        //                 --max-line-length 120 --extend-ignore E501,F401,F821
-        //             flake8 k8s-lstm/ --max-line-length 120 --extend-ignore E501,E999
-        //         '''
-        //     }
-        // }
+                    # Lint the final artifacts
+                    nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
+                        --max-line-length 120 --extend-ignore E501,F401,F821
+                    flake8 k8s-lstm/ --max-line-length 120 --extend-ignore E501,E999
+                '''
+            }
+            post {
+                success { echo "✅ Linting completed successfully" }
+                failure { echo "❌ Linting failed" }
+            }
+        }
 
-        // /* 3. Build & push the image (needs DinD)                   */
-        // stage('Build') {
-        //     agent {
-        //         docker { image 'docker:24.0.7'; args  '-v /var/run/docker.sock:/var/run/docker.sock -u 0:0' }
-        //     }
-        //     steps {
-        //         withCredentials([usernamePassword(
-        //                 credentialsId: 'dockerhub-pat',
-        //                 usernameVariable: 'DOCKER_USR',
-        //                 passwordVariable: 'DOCKER_PSW')]) {
+        stage('Build & Push') {
+            when {
+                not { params.SKIP_TESTS }
+            }
+            agent {
+                docker { 
+                    image 'docker:24.0.7'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock -u 0:0'
+                }
+            }
+            steps {
+                unstash 'repo-source'
+                withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-pat',
+                        usernameVariable: 'DOCKER_USR',
+                        passwordVariable: 'DOCKER_PSW')]) {
 
-        //             sh '''
-        //                 cd k8s-lstm
-        //                 echo "$DOCKER_PSW" | docker login -u "$DOCKER_USR" --password-stdin
-        //                 docker build -t $FULL_IMAGE .
-        //                 docker push  $FULL_IMAGE
-        //             '''
-        //         }
-        //     }
-        //     post {
-        //         success { echo "✅ Image built and pushed: ${FULL_IMAGE}" }
-        //     }
-        // }
+                    sh '''
+                        cd k8s-lstm
+                        echo "$DOCKER_PSW" | docker login -u "$DOCKER_USR" --password-stdin
+                        docker build -t $FULL_IMAGE .
+                        docker push $FULL_IMAGE
+                    '''
+                }
+            }
+            post {
+                success { 
+                    echo "✅ Image built and pushed: ${FULL_IMAGE}"
+                    script { updateJobStatus('build_complete') }
+                }
+                failure { echo "❌ Docker build/push failed" }
+            }
+        }
 
-//         stage('Deploy') {
-//             when {
-//                 expression { return !params.DEPLOY_STANDBY_ONLY }
-//             }
-//             agent {
-//                 kubernetes {
-//                     cloud 'k8s-automated-dr'
-//                     yaml """
-// apiVersion: v1
-// kind: Pod
-// metadata:
-//   labels:
-//     jenkins: agent
-// spec:
-//   serviceAccountName: jenkins-agent
-//   containers:
-//   - name: jnlp
-//     image: jenkins/inbound-agent:latest
-//     resources:
-//       requests:
-//         memory: "256Mi"
-//         cpu: "100m"
-//       limits:
-//         memory: "512Mi"
-//         cpu: "500m"
-//   - name: kubectl
-//     image: bitnami/kubectl:latest
-//     command: ["sleep"]
-//     args: ["99d"]
-//     tty: true
-//     securityContext:
-//       runAsUser: 1000
-//       runAsGroup: 1000
-//     resources:
-//       requests:
-//         memory: "128Mi"
-//         cpu: "50m"
-//       limits:
-//         memory: "256Mi"
-//         cpu: "200m"
-//   restartPolicy: Never
-// """
-//                     defaultContainer 'kubectl'
-//                 }
-//             }
-//             options { skipDefaultCheckout() }
-//             steps {
-//                 unstash 'repo-source'
-//                 container('kubectl') {
-//                     sh '''
-//                         echo "🔧 Applying Kubernetes manifests..."
-//                         kubectl version 
-//                         kubectl config view 
+        stage('Deploy Production') {
+            when {
+                expression { return !params.DEPLOY_STANDBY_ONLY }
+            }
+            agent {
+                kubernetes {
+                    cloud 'k8s-automated-dr'
+                    yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: agent
+spec:
+  serviceAccountName: jenkins-agent
+  containers:
+  - name: jnlp
+    image: jenkins/inbound-agent:latest
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ["sleep"]
+    args: ["99d"]
+    tty: true
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+  restartPolicy: Never
+"""
+                    defaultContainer 'kubectl'
+                }
+            }
+            options { skipDefaultCheckout() }
+            steps {
+                unstash 'repo-source'
+                container('kubectl') {
+                    sh '''
+                        echo "🔧 Applying Kubernetes manifests to PRODUCTION..."
+                        kubectl version 
                         
-//                         # Check if we can connect to the cluster
-//                         if ! kubectl get nodes; then
-//                             echo "❌ Cannot connect to Kubernetes cluster"
-//                             exit 1
-//                         fi
+                        # Check cluster connectivity
+                        if ! kubectl get nodes; then
+                            echo "❌ Cannot connect to Kubernetes cluster"
+                            exit 1
+                        fi
                         
-//                         # Check if Chaos Mesh CRDs are available
-//                         if kubectl api-resources | grep -q "stresschaos"; then
-//                             echo "▶️  Applying Chaos Mesh experiments"
-//                             kubectl apply -R -f k8s-manifests/ --validate=false
-//                         else
-//                             echo "⚠️  Skipping StressChaos objects (CRDs not installed)"
-//                             # Apply non-chaos manifests only
-//                             find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
-//                                 if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "$file"; then
-//                                     kubectl apply -f "$file"
-//                                 fi
-//                             done
-//                         fi
-//                     '''
-//                 }
-//             }
-//             post {
-//                 success {
-//                     echo '✅ Kubernetes manifests applied successfully.'
-//                 }
-//                 failure {
-//                     echo '❌ Failed to apply Kubernetes manifests'
-//                 }
-//             }
-//         }
+                        # Apply manifests with Chaos Mesh support
+                        if kubectl api-resources | grep -q "stresschaos"; then
+                            echo "▶️ Applying Chaos Mesh experiments"
+                            kubectl apply -R -f k8s-manifests/ --validate=false
+                        else
+                            echo "⚠️ Skipping StressChaos objects (CRDs not installed)"
+                            find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
+                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "$file"; then
+                                    kubectl apply -f "$file"
+                                fi
+                            done
+                        fi
+                    '''
+                }
+            }
+            post {
+                success {
+                    echo '✅ Production deployment completed successfully'
+                    script { updateJobStatus('production_deployed') }
+                }
+                failure {
+                    echo '❌ Production deployment failed'
+                }
+            }
+        }
         
-        stage('Deploy Standby Terraform') {
+        stage('Deploy Standby') {
             when {
                 anyOf {
                     expression { return params.DEPLOY_STANDBY_ONLY }
+                    expression { return !params.DEPLOY_STANDBY_ONLY } // Always deploy standby for DR
                 }
             }
             agent {
                 docker {
                     image 'freshinit/jenkins-agent-with-tools:latest'
-                    args '-u root:root'  // Run as root to avoid permission issues
+                    args '-u root:root'
                 }
             }
             options { skipDefaultCheckout() }
             steps {
                 unstash 'repo-source'
                 withCredentials([
-                    // file(credentialsId: 'my-ssh-key', variable: 'PEM_KEY_PATH'),
                     string(credentialsId: 'aws_access_key', variable: 'AWS_ACCESS_KEY'),
                     string(credentialsId: 'aws_secret_key', variable: 'AWS_SECRET_KEY'),
                     string(credentialsId: 'backup_bucket', variable: 'BACKUP_BUCKET'),
                     string(credentialsId: 'backup_bucket_region', variable: 'BACKUP_BUCKET_REGION')
                 ]) {
                     dir('./infra/terraform/standby_terraform') {
-                        sh """
-                            set -e  # Exit immediately on error
-
-                            echo "[INFO] Setting up environment variables..."
-                            export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
-                            export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
-                            export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
-                            export VELERO_REGION=${BACKUP_BUCKET_REGION}
-                            export TF_VAR_aws_access_key_id=${AWS_ACCESS_KEY}
-                            export TF_VAR_aws_secret_access_key=${AWS_SECRET_KEY}
-                            export TF_VAR_velero_bucket_name=${BACKUP_BUCKET}
-                            export TF_VAR_velero_aws_region=${BACKUP_BUCKET_REGION}
-
-                            if [ -z "\${AWS_ACCESS_KEY}" ] || [ -z "\${AWS_SECRET_KEY}" ]; then
-                                echo "[ERROR] AWS credentials not provided"
-                                exit 1
-                            fi
-
-                            echo "[INFO] Setting up safe HOME directory..."
-                            export HOME="\$WORKSPACE/tmp_home"
-                            mkdir -p "\$HOME"
-
-                            echo "[INFO] HOME set to: \$HOME"
-                            echo "[INFO] Current user:"
-                            whoami || echo "[WARN] Unable to resolve username for UID \$(id -u)"
-
-                            if [ -d ".terraform" ] || [ -f ".terraform.lock.hcl" ] || [ -f "terraform.tfstate" ] || [ -f "terraform.tfstate.backup" ]; then
-                                # Remove files/folders if present
-                                rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
-                            fi
+                        script {
+                            def deploymentType = params.DEPLOY_STANDBY_ONLY ? "STANDBY ONLY" : "STANDBY (DR)"
+                            echo "🏗️ Deploying ${deploymentType} environment with Terraform"
                             
-                            echo "[INFO] Initializing Terraform..."
-                            terraform init
+                            sh """
+                                set -e
 
-                            echo "[INFO] Planning Terraform deployment..."
-                            terraform plan -out=tfplan
-                                
-                            # Apply the plan
-                            echo "[INFO] Applying Terraform plan..."
-                            if terraform apply tfplan; then
-                                echo "[INFO] Terraform apply successful"
-                                
-                                # Check if user requested destruction after apply
-                                if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
-                                    echo "[INFO] DESTROY_AFTER_APPLY is enabled - destroying resources..."
-                                    echo "[INFO] Waiting for 15 minutes before destroying resources..."
-                                    echo "[INFO] This is to ensure all resources are fully provisioned and stable before destruction"
-                                    sleep 900 && echo "15 minutes elapsed!"
-                                    terraform destroy -auto-approve
-                                else
-                                    echo "[INFO] DESTROY_AFTER_APPLY is disabled - resources will remain deployed"
+                                echo "[INFO] Setting up environment variables..."
+                                export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
+                                export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
+                                export TF_VAR_aws_access_key_id=${AWS_ACCESS_KEY}
+                                export TF_VAR_aws_secret_access_key=${AWS_SECRET_KEY}
+                                export TF_VAR_velero_bucket_name=${BACKUP_BUCKET}
+                                export TF_VAR_velero_aws_region=${BACKUP_BUCKET_REGION}
+
+                                # Validate credentials
+                                if [ -z "\${AWS_ACCESS_KEY}" ] || [ -z "\${AWS_SECRET_KEY}" ]; then
+                                    echo "[ERROR] AWS credentials not provided"
+                                    exit 1
                                 fi
-                            else
-                                echo "[ERROR] Terraform apply failed"
-                                echo "[INFO] Attempting to destroy any partially created resources..."
-                                terraform destroy -auto-approve || echo "[WARN] Destroy failed, manual cleanup may be required"
-                                exit 1
-                            fi
-                        """
+
+                                # Setup safe HOME directory
+                                export HOME="\$WORKSPACE/tmp_home"
+                                mkdir -p "\$HOME"
+
+                                # Clean previous Terraform state
+                                rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+                                
+                                echo "[INFO] Initializing Terraform..."
+                                terraform init
+
+                                echo "[INFO] Planning Terraform deployment..."
+                                terraform plan -out=tfplan
+                                    
+                                echo "[INFO] Applying Terraform plan..."
+                                if terraform apply tfplan; then
+                                    echo "[SUCCESS] Terraform apply successful"
+                                    
+                                    # Handle destroy after apply option
+                                    if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
+                                        echo "[INFO] DESTROY_AFTER_APPLY enabled - destroying resources in 15 minutes..."
+                                        sleep 900
+                                        terraform destroy -auto-approve
+                                        echo "[INFO] Resources destroyed as requested"
+                                    else
+                                        echo "[INFO] DESTROY_AFTER_APPLY disabled - resources remain deployed"
+                                    fi
+                                else
+                                    echo "[ERROR] Terraform apply failed"
+                                    echo "[INFO] Attempting cleanup of partial resources..."
+                                    terraform destroy -auto-approve || echo "[WARN] Destroy failed"
+                                    exit 1
+                                fi
+                            """
+                        }
                     }
+                }
+            }
+            post {
+                success {
+                    echo '✅ Standby environment deployed successfully'
+                    script { updateJobStatus('standby_deployed') }
+                }
+                failure {
+                    echo '❌ Standby deployment failed'
                 }
             }
         }
     }
     
     post {
-        always { cleanWs() }
-        success { echo "✅ Pipeline completed successfully." }
-        failure { echo '❌ Pipeline failed' }
+        always { 
+            cleanWs()
+            script { updateJobStatus('completed') }
+        }
+        success { 
+            echo "✅ DR Pipeline completed successfully"
+            script { updateJobStatus('success') }
+        }
+        failure { 
+            echo '❌ DR Pipeline failed'
+            script { updateJobStatus('failed') }
+        }
     }
 }
 
-def processRedisQueue() {
-    // Use Redis CLI or Jenkins Redis plugin
-    def queueScript = '''
-    import redis
-    import json
-    import time
-    import subprocess
-    import sys
+// Helper function to update job status in Redis (optional)
+def updateJobStatus(String status) {
+    try {
+        // Only update if we have build parameters indicating this was triggered by the Node.js service
+        if (env.BUILD_CAUSE?.contains('GenericWebHookCause') || params.containsKey('DEPLOY_STANDBY_ONLY')) {
+            sh """
+                python3 -c "
+import redis
+import json
+import os
+from datetime import datetime
+
+try:
+    r = redis.Redis(host='localhost', port=6379, decode_responses=True)
     
-    def process_dr_queue():
-        r = redis.Redis(host='localhost', port=6379, decode_responses=True)
-        
-        while True:
-            try:
-                # Blocking pop from queue (30 second timeout)
-                job_data = r.brpop('dr-queue', timeout=30)
-                
-                if job_data:
-                    queue_name, job_json = job_data
-                    job = json.loads(job_json)
-                    
-                    print(f"Processing DR job: {job['id']}")
-                    
-                    # Move to processing queue
-                    r.lpush('dr-processing', job_json)
-                    
-                    # Trigger the actual Jenkins job with parameters
-                    trigger_jenkins_job(job)
-                    
-                    # Remove from processing queue when done
-                    r.lrem('dr-processing', 1, job_json)
-                    
-                else:
-                    print("No jobs in queue, continuing to poll...")
-                    
-            except Exception as e:
-                print(f"Error processing queue: {e}")
-                time.sleep(5)  # Wait before retrying
+    job_update = {
+        'build_number': '${env.BUILD_NUMBER}',
+        'build_url': '${env.BUILD_URL}',
+        'status': '${status}',
+        'timestamp': datetime.now().isoformat(),
+        'parameters': {
+            'DEPLOY_STANDBY_ONLY': '${params.DEPLOY_STANDBY_ONLY}',
+            'DESTROY_AFTER_APPLY': '${params.DESTROY_AFTER_APPLY}',
+            'SKIP_TESTS': '${params.SKIP_TESTS}'
+        }
+    }
     
-    def trigger_jenkins_job(job):
-        """
-        Trigger the actual DR Jenkins job with parameters
-        """
-        pipeline_name = job['pipeline_name']
-        branch_name = job['branch_name']
-        parameters = job['parameters']
-        
-        # Build Jenkins CLI command
-        cmd = [
-            'java', '-jar', '/var/jenkins_home/jenkins-cli.jar',
-            '-s', 'http://localhost:8080',
-            '-auth', f"${env.JENKINS_USER}:${env.JENKINS_API_TOKEN}",
-            'build', f"{pipeline_name}/{branch_name}",
-            '-p', f"DEPLOY_STANDBY_ONLY={parameters['DEPLOY_STANDBY_ONLY']}",
-            '-p', f"DESTROY_AFTER_APPLY={parameters['DESTROY_AFTER_APPLY']}",
-            '-p', f"SKIP_TESTS={parameters['SKIP_TESTS']}",
-            '-p', f"TRIGGERED_BY=redis-queue",
-            '-p', f"JOB_ID={job['id']}"
-        ]
-        
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode == 0:
-                print(f"Successfully triggered job {job['id']}")
-            else:
-                print(f"Failed to trigger job {job['id']}: {result.stderr}")
-                
-        except subprocess.TimeoutExpired:
-            print(f"Timeout triggering job {job['id']}")
-        except Exception as e:
-            print(f"Error triggering job {job['id']}: {e}")
+    # Store job status with build number as key
+    r.hset('jenkins_jobs', '${env.BUILD_NUMBER}', json.dumps(job_update))
+    print(f'Updated job status: ${status}')
     
-    if __name__ == "__main__":
-        process_dr_queue()
-    '''
-    
-    // Write the script to a file and execute it
-    writeFile file: 'process_queue.py', text: queueScript
-    
-    // Execute the queue processor
-    sh '''
-        python3 process_queue.py
-    '''
+except Exception as e:
+    print(f'Failed to update job status: {e}')
+"
+            """
+        }
+    } catch (Exception e) {
+        echo "Warning: Could not update job status in Redis: ${e.getMessage()}"
+    }
 }

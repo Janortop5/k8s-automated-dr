@@ -14,3 +14,11 @@ velero_volume_snapshot_locations: "aws"
 # Remote vault token
 remote_vault_token: "${remote_vault_token}"
 remote_vault_address: "${remote_vault_address}"
+
+# Remote Jenkins
+jenkins_username: "${jenkins_username}"
+jenkins_password: "${jenkins_password}"
+
+# Git credentials
+git_username: "${git_username}"
+git_password: "${git_password}"

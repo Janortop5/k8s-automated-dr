@@ -45,6 +45,24 @@
     "
   register: velero_result
 
+- name: Store jenkins credentials
+  shell: |
+    docker exec -i tf_vault sh << EOF
+    export VAULT_ADDR="http://127.0.0.1:8200"
+    vault login {{ remote_vault_token }}
+    vault kv put secret/jenkins jenkins_username="{{ jenkins_username }}" jenkins_password="{{ jenkins_password }}"
+    EOF
+  register: jenkins_result
+
+- name: Store git credentials
+  shell: |
+    docker exec -i tf_vault sh << EOF
+    export VAULT_ADDR="http://127.0.0.1:8200"
+    vault login {{ remote_vault_token }}
+    vault kv put secret/git_credentials git_username="{{ git_username }}" git_password="\{{ git_password }}"
+    EOF
+  register: git_result
+
 - name: Display setup status
   debug:
     msg: 

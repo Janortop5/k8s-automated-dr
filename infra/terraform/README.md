@@ -36,7 +36,7 @@ terraform plan
 ```bash
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token* && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/velero bucket_name='velero-demo' region='us-west-2'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/velero bucket_name='velero-demo-01' region='us-west-2'"
 
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/remote vault_address='http://127.0.0.1:8200' vault_token='your-vault-token'"
 ```
@@ -46,8 +46,8 @@ docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vau
 docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=0102911' --name 'tf_vault' -p 8200:8200 hashicorp/vault:latest
 
 export TF_VAR_vault_address='http://127.0.0.1:8200'
-export TF_VAR_ansible_vault_password='0102911'
-export TF_VAR_vault_token='0102911'
+export TF_VAR_ansible_vault_password='your-ansible-vault-token'
+export TF_VAR_vault_token='your-vault-token'
 export TF_LOG=DEBUG
 
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login 0102911 && vault kv put secret/test username='admin' password='1234'"
@@ -55,6 +55,12 @@ docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vau
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login 0102911 && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
 
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login 0102911 && vault kv put secret/velero bucket_name='velero-demo-01' region='us-west-2'"
+
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/remote vault_address='http://127.0.0.1:8200' vault_token='your-vault-token'"
+
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/jenkins jenkins_username='your-jenkins-username' jenkins_password='your-jenkins-password'"
+
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/git_credentials git_username='your-git-username' git_password='your-git-password'"
 ```
 #### Run Terraform
 - Format, Validate, Initialize and run the Terraform Configuration.

@@ -14,6 +14,22 @@ variable "ansible_vault_password" {
   sensitive   = true
 }
 
+variable "vault_remote_path" {
+  description = "Path to remote Vault token in Vault"
+  default     = "secret/remote"
+}
+
+variable "vault_jenkins_path" {
+  description = "Path to Jenkins credentials in Vault"
+  default     = "secret/jenkins"
+}
+
+variable "vault_git_path" {
+  description = "Path to Git credentials in Vault"
+  default     = "secret/git_credentials"
+  
+}
+
 variable "environment" {
   description = "Environment name (dev, staging, prod)"
   type        = string

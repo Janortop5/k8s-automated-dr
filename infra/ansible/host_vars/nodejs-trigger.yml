@@ -1,0 +1,22 @@
+# Nodejs environment configuration
+nodejs_version: "18"
+app_name: "nodejs-trigger"
+app_user: "{{ app_name }}"
+app_dir: "/opt/{{ app_name }}"
+service_port: 3000
+letsencrypt_email: "emmanuelaladejana05@gmail.com"
+public_suffixes:
+  - nip.io
+  - sslip.io
+
+# Service configuration
+REDIS_HOST: "{{ redis_host | default('localhost') }}"
+REDIS_PORT: "{{ redis_port | default('6379') }}"
+VAULT_ADDR: "{{ vault_address }}"
+VAULT_TOKEN: "{{ vault_token }}"
+JENKINS_URL: "{{ jenkins_live_domain | default('http://localhost:8080') }}"
+PIPELINE_NAME: "{{ jenkins_pipeline_name | default('k8s-automated-dr') }}"
+BRANCH_NAME: "{{ jenkins_branch_name | default('main') }}"
+PORT: "{{ service_port }}"
+HOST: "0.0.0.0"
+NODE_ENV: "production"

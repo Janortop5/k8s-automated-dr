@@ -10,6 +10,10 @@ jenkins_repo_url: "https://pkg.jenkins.io/debian"
 jenkins_repo_components: "binary/"
 jenkins_pkg_name: "jenkins"
 letsencrypt_email: "emmanuelaladejana05@gmail.com"
+jenkins_token_name: "k8s-automated-dr"
+git_repo_url: "https://github.com/Janortop5/k8s-automated-dr.git"
+jenkins_live_domain: "jenkins.{{ jenkins_public_ip }}.nip.io"  ## this is temporary for testing purposes
+
 # Iterate over every suffix until Cerbot succeeds
 public_suffixes:
   - nip.io

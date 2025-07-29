@@ -1,0 +1,325 @@
+- name: Generate Jenkins webhook token
+  set_fact:
+    webhook_token: "{{ ansible_date_time.epoch }}{{ 999999999 | random }}"
+      
+- name: Execute Jenkins job creation script
+  uri:
+    url: "https://{{ jenkins_live_domain }}/scriptText"
+    method: POST
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+    headers:
+      Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
+    body_format: form-urlencoded
+    body:
+      script: |
+        import jenkins.model.*
+        import org.jenkinsci.plugins.workflow.job.WorkflowJob
+        import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
+        import hudson.plugins.git.GitSCM
+        import hudson.plugins.git.BranchSpec
+        import hudson.plugins.git.UserRemoteConfig
+        import org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty
+        import org.jenkinsci.plugins.gwt.GenericTrigger
+        import org.jenkinsci.plugins.gwt.GenericVariable
+        
+        def jenkins = Jenkins.instance
+        def jobName = "{{ jenkins_job_name | default('k8s-automated-dr') }}"
+        
+        // Delete existing job if it exists
+        def existingJob = jenkins.getItem(jobName)
+        if (existingJob != null) {
+            existingJob.delete()
+        }
+        
+        // Create new pipeline job
+        def job = jenkins.createProject(WorkflowJob, jobName)
+        job.description = "DR Pipeline with Webhook Trigger"
+        
+        // Configure Git SCM
+        def gitSCM = new GitSCM([new UserRemoteConfig("{{ git_repo_url }}", "{{ git_credentials_id | default('') }}")])
+        gitSCM.branches = [new BranchSpec("{{ git_branch | default('*/main') }}")]
+        
+        // Set pipeline definition from SCM
+        def flowDefinition = new CpsScmFlowDefinition(gitSCM, "{{ jenkinsfile_path | default('Jenkinsfile') }}")
+        flowDefinition.lightweight = true
+        job.definition = flowDefinition
+        
+        // Configure webhook trigger
+        def genericVariables = [
+            new GenericVariable("DEPLOY_STANDBY_ONLY", "\$.parameters.deploy_standby_only", "JSONPath", "false"),
+            new GenericVariable("DESTROY_AFTER_APPLY", "\$.parameters.destroy_after_apply", "JSONPath", "false"),
+            new GenericVariable("SKIP_TESTS", "\$.parameters.skip_tests", "JSONPath", "false")
+        ]
+        
+        def genericTrigger = new GenericTrigger(
+            genericVariables,
+            "",  // regexFilter
+            "",  // regexFilterText
+            "{{ webhook_token }}",  // token
+            true,  // printContributedVariables
+            true,  // printPostContent
+            false, // silentResponse
+            false  // shouldNotFlatten
+        )
+        
+        def triggerProperty = new PipelineTriggersJobProperty([genericTrigger])
+        job.addProperty(triggerProperty)
+        
+        // Save the job
+        job.save()
+        
+        println("Pipeline job '${jobName}' created successfully")
+    status_code: [200]
+    validate_certs: no
+  register: job_creation_result
+
+- name: Store webhook configuration in Vault
+  uri:
+    url: "{{ remote_vault_address }}/v1/secret/data/jenkins/{{ jenkins_job_name | default('k8s-automated-dr') }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ remote_vault_token }}"
+    body_format: json
+    body:
+      data:
+        data:
+          webhook_token: "{{ webhook_token }}"
+          webhook_url: "{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
+          jenkins_job_url: "{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}"
+    status_code: [200, 204]
+    validate_certs: no
+
+- name: Display webhook configuration
+  debug:
+    msg:
+      - "✅ Jenkins webhook registered"
+      - "Webhook URL: {{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
+      - "Node.js trigger will handle parameter processing and queuing"
+
+- name: Create application user
+  user:
+    name: "{{ app_user }}"
+    system: true
+    shell: /bin/bash
+    home: "{{ app_dir }}"
+    create_home: no
+
+- name: Create application directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Create logs directory
+  file:
+    path: "{{ app_dir }}/logs"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Install Node.js and npm (Ubuntu/Debian)
+  apt:
+    name:
+      - nodejs
+      - npm
+    state: present
+    update_cache: yes
+
+- name: Synchronize trigger application files
+  synchronize:
+    src: "{{ playbook_dir }}/files/trigger/"
+    dest: "{{ app_dir }}/"
+    recursive: yes
+
+- name: Set ownership of application files
+  file:
+    path: "{{ app_dir }}"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    recurse: yes
+
+- name: Install Node.js dependencies
+  npm:
+    path: "{{ app_dir }}/."
+    state: present
+    production: true
+  become_user: "{{ app_user }}"
+
+- name: Install systemd unit for nodejs-trigger service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/{{ app_name }}.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Node.js Jenkins Trigger Service
+      Documentation=https://github.com/your-org/nodejs-trigger
+      After=network.target redis.service
+      Wants=redis.service
+
+      [Service]
+      Type=simple
+      User={{ app_user }}
+      Group={{ app_user }}
+      WorkingDirectory={{ app_dir }}
+      Environment=NODE_ENV=production
+      EnvironmentFile={{ app_dir }}/.env
+      ExecStart=/usr/bin/node {{ app_dir }}/index.js
+      ExecReload=/bin/kill -HUP $MAINPID
+      Restart=always
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+      SyslogIdentifier={{ app_name }}
+
+      # Security settings
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectSystem=strict
+      ProtectHome=true
+      ReadWritePaths={{ app_dir }}
+
+      # Resource limits
+      LimitNOFILE=65536
+      LimitNPROC=4096
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - reload systemd
+    - Restart {{ app_name }}
+    
+- name: Enable and start Node.js service
+  systemd:
+    name: "{{ app_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Check service status
+  systemd:
+    name: "{{ app_name }}"
+    state: started
+  register: service_status
+
+- name: Display service information
+  debug:
+    msg:
+      - "✅ Node.js Trigger Service Setup Complete"
+      - "Service: {{ app_name }}"
+      - "Status: {{ service_status.status.ActiveState }}"
+      - "Port: {{ service_port }}"
+      - "Directory: {{ app_dir }}"
+      - "User: {{ app_user }}"
+      - ""
+      - "🔗 Endpoints:"
+      - "  Health Check: http://{{ ansible_host }}/health"
+      - "  Trigger: POST http://{{ ansible_host }}/trigger"
+      - "  Queue Status: http://{{ ansible_host }}/queue/status"
+      - ""
+      - "📝 Test with:"
+      - "curl -X POST http://{{ ansible_host }}/trigger \\"
+      - "  -H 'Content-Type: application/json' \\"
+      - "  -d '{\"parameters\":{\"deploy_standby_only\":\"true\"}}'"
+
+# ---------------------------------------------------------------------------
+# 1. Issue new cert for trigger.<ip>.<suffix>
+# ---------------------------------------------------------------------------
+- name: Attempt certbot for trigger.<ip>.<suffix>
+  shell: |
+    DOMAIN="trigger.{{ jenkins_public_ip }}.{{ item }}"
+    if [ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+      certbot --nginx --non-interactive --agree-tos \
+              --email {{ letsencrypt_email }} \
+              --redirect \
+              -d "${DOMAIN}"
+    fi
+  args:
+    executable: /bin/bash
+  register: certbot_trigger_attempts
+  failed_when: false
+  loop: "{{ public_suffixes }}"
+  loop_control:
+    label: "trigger.{{ app_public_ip }}.{{ item }}"
+  notify: reload nginx
+
+- name: Record successful domain for nodejs-trigger
+  set_fact:
+    trigger_live_domain: "trigger.{{ jenkins_public_ip }}.{{ item.item }}"
+  when: item.rc is defined and item.rc == 0
+  loop: "{{ certbot_trigger_attempts.results }}"
+
+- name: Fail if cert not obtained for nodejs-trigger
+  fail:
+    msg: >
+      Could not obtain a certificate for trigger.<ip>.<suffix>. Tried:
+      {{ public_suffixes | map('regex_replace', '(.*)', 'trigger.' ~ jenkins_public_ip ~ '.\\1') | join(', ') }}
+  when: trigger_live_domain is not defined
+
+- name: Install HTTPS vhost for nodejs-trigger
+  copy:
+    dest: /etc/nginx/sites-available/nodejs-ssl.conf
+    mode: "0644"
+    content: |
+      server {
+          listen 443 ssl http2;
+          server_name {{ trigger_live_domain }};
+
+          ssl_certificate     /etc/letsencrypt/live/{{ trigger_live_domain }}/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/{{ trigger_live_domain }}/privkey.pem;
+
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_session_cache   shared:SSL:10m;
+          ssl_prefer_server_ciphers on;
+
+          location / {
+              proxy_pass http://127.0.0.1:{{ service_port }};
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection 'upgrade';
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_cache_bypass $http_upgrade;
+          }
+
+          location /health {
+              proxy_pass http://127.0.0.1:{{ service_port }};
+              access_log off;
+          }
+
+          access_log /var/log/nginx/{{ app_name }}_access.log;
+          error_log /var/log/nginx/{{ app_name }}_error.log;
+      }
+  notify: reload nginx
+
+- name: Install HTTP→HTTPS redirect for nodejs-trigger
+  copy:
+    dest: /etc/nginx/sites-available/nodejs-http.conf
+    mode: "0644"
+    content: |
+      server {
+          listen 80;
+          server_name {{ trigger_live_domain }};
+          return 301 https://$host$request_uri;
+      }
+  notify: reload nginx
+
+- name: Enable nodejs HTTPS vhost
+  file:
+    src: /etc/nginx/sites-available/nodejs-ssl.conf
+    dest: /etc/nginx/sites-enabled/nodejs-ssl.conf
+    state: link
+  notify: reload nginx
+
+- name: Enable nodejs HTTP redirect vhost
+  file:
+    src: /etc/nginx/sites-available/nodejs-http.conf
+    dest: /etc/nginx/sites-enabled/nodejs-http.conf
+    state: link
+  notify: reload nginx

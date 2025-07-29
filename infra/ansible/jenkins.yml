@@ -4,28 +4,34 @@
   gather_facts: true
   vars_files:
     - host_vars/jenkins-ci.yml
+    - host_vars/nodejs-trigger.yml
     - group_vars/secrets.yml
     - group_vars/all.yml
 
   tasks:
-  - name: Install Jenkins
-    import_tasks: tasks/install_jenkins.yml
-    tags: jenkins
-    when: "'jenkins-server' in group_names"
-
-  - name: Install Jenkins plugins
-    import_tasks: tasks/install_extra_jenkins_settings.yml
-    tags: jenkins
-    when: "'jenkins-server' in group_names"
-  
   - name: Install Docker
     import_tasks: tasks/install_docker.yml
     tags: docker
     when: "'jenkins-server' in group_names"
 
-  - name: Setup Vault Development Container
+  - name: Install Jenkins
+    import_tasks: tasks/install_jenkins.yml
+    tags: jenkins
+    when: "'jenkins-server' in group_names"
+
+  - name: Setup Vault Container
     import_tasks: tasks/setup_vault.yml
     tags: vault
+    when: "'jenkins-server' in group_names"
+
+  - name: Setup Jenkins dependencies
+    import_tasks: tasks/install_extra_jenkins_settings.yml
+    tags: jenkins
+    when: "'jenkins-server' in group_names"
+
+  - name: Jenkins trigger configuration
+    import_tasks: tasks/setup_recovery.yml
+    tags: jenkins
     when: "'jenkins-server' in group_names"
 
   handlers:
@@ -38,3 +44,12 @@
       service:
         name: nginx
         state: reloaded
+
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart nodejs-trigger
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted
