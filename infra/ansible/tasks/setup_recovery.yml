@@ -76,21 +76,14 @@
   register: job_creation_result
 
 - name: Store webhook configuration in Vault
-  uri:
-    url: "{{ remote_vault_address }}/v1/secret/data/jenkins/{{ jenkins_job_name | default('k8s-automated-dr') }}"
-    method: POST
-    headers:
-      X-Vault-Token: "{{ remote_vault_token }}"
-    body_format: json
-    body:
-      data:
-        data:
-          webhook_token: "{{ webhook_token }}"
-          webhook_url: "{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
-          jenkins_job_url: "{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}"
-    status_code: [200, 204]
-    validate_certs: no
-
+  shell: |
+    docker exec -i tf_vault sh << EOF
+    export VAULT_ADDR="http://127.0.0.1:8200"
+    vault login {{ remote_vault_token }}
+    vault kv put secret/jenkins webhook_token="{{ webhook_token }}" webhook_url="{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
+    EOF
+  register: jenkins_result
+  
 - name: Display webhook configuration
   debug:
     msg:
