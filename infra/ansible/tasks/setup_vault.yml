@@ -10,7 +10,7 @@
 
 - name: Wait for Vault to initialize
   pause:
-    seconds: 5
+    seconds: 10
 
 - name: Set environment variables
   shell: |

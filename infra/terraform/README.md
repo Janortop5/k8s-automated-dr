@@ -8,21 +8,26 @@ This Terraform Configuration creates a Functional Kubeadm Kubernetes Environment
 
 ## How to use our terraform IaC
 #### First create Terraform vault.
-- Create terraform vault docker container.
-```bash
-docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=your-tf-vault-token' --name 'tf_vault' -p 8200:8200 hashicorp/vault:latest
-```
 - Add environment variables.
 ```bash
 export TF_VAR_vault_address='http://127.0.0.1:8200'
-export TF_VAR_ansible_vault_password='your-ansible-vault-password'
+export TF_VAR_ansible_vault_password='your-ansible-vault-token'
 export TF_VAR_vault_token='your-tf-vault-token'
 export TF_LOG=DEBUG
+export vault_token='your-tf-vault-token'
+export jenkins_username='your-jenkins-username'
+export jenkins_password='your-jenkins-password'
+export git_username='your-git-username'
+export git_password='your-git-password'
+```
+- Create terraform vault docker container.
+```bash
+docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=${vault_token}' --name 'tf_vault' -p 8200:8200 hashicorp/vault:latest
 ```
 #### Test Vault Setup
 - **Create test password.**
 ```bash
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-tf-vault-token && vault kv put secret/test username='admin' password='1234'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/test username='admin' password='1234'"
 ```
 - **Test connection:** look for output -> `test_username = "admin"`
 ```
@@ -34,11 +39,23 @@ terraform plan
 ```
 - **Create TF Vault Secrets**
 ```bash
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token* && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/velero bucket_name='velero-demo-01' region='us-west-2'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/velero bucket_name='velero-demo-01' region='us-west-2'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/remote vault_address='http://127.0.0.1:8200' vault_token='your-vault-token'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/remote vault_address='http://127.0.0.1:8200' vault_token='${vault_token}'"
+
+docker exec -i tf_vault sh << EOF
+export VAULT_ADDR="http://127.0.0.1:8200"
+vault login $vault_token
+vault kv put secret/jenkins jenkins_username=${jenkins_username} jenkins_password=${jenkins_password}
+EOF
+
+docker exec -i tf_vault sh << EOF
+export VAULT_ADDR="http://127.0.0.1:8200"
+vault login $vault_token
+vault kv put secret/git_credentials git_username=${git_username} git_password='\${git_password}'
+EOF
 ```
 
 #### Everything together
@@ -47,20 +64,33 @@ docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=0102911' --name '
 
 export TF_VAR_vault_address='http://127.0.0.1:8200'
 export TF_VAR_ansible_vault_password='your-ansible-vault-token'
-export TF_VAR_vault_token='your-vault-token'
+export TF_VAR_vault_token='your-tf-vault-token'
 export TF_LOG=DEBUG
+export vault_token='your-tf-vault-token'
+export jenkins_username='your-jenkins-username'
+export jenkins_password='your-jenkins-password'
+export git_username='your-git-username'
+export git_password='your-git-password'
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login 0102911 && vault kv put secret/test username='admin' password='1234'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/test username='admin' password='1234'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login 0102911 && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/aws access_key='AKIA...' secret_key='your-secret-key'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login 0102911 && vault kv put secret/velero bucket_name='velero-demo-01' region='us-west-2'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/velero bucket_name='velero-demo-01' region='us-west-2'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/remote vault_address='http://127.0.0.1:8200' vault_token='your-vault-token'"
+docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/remote vault_address='http://127.0.0.1:8200' vault_token='${vault_token}'"
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/jenkins jenkins_username='your-jenkins-username' jenkins_password='your-jenkins-password'"
+docker exec -i tf_vault sh << EOF
+export VAULT_ADDR="http://127.0.0.1:8200"
+vault login ${vault_token}
+vault kv put secret/jenkins jenkins_username=${jenkins_username} jenkins_password=${jenkins_password}
+EOF
 
-docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login your-vault-token && vault kv put secret/git_credentials git_username='your-git-username' git_password='your-git-password'"
+docker exec -i tf_vault sh << EOF
+export VAULT_ADDR="http://127.0.0.1:8200"
+vault login $vault_token
+vault kv put secret/git_credentials git_username=$git_username git_password=$git_password
+EOF
 ```
 #### Run Terraform
 - Format, Validate, Initialize and run the Terraform Configuration.
