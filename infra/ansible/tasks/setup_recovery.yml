@@ -82,7 +82,6 @@
     vault login {{ remote_vault_token }}
     vault kv put secret/jenkins webhook_token="{{ webhook_token }}" webhook_url="{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
     EOF
-  register: jenkins_result
   
 - name: Display webhook configuration
   debug:
