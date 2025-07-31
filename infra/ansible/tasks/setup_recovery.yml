@@ -80,14 +80,14 @@
     docker exec -i tf_vault sh << EOF
     export VAULT_ADDR="http://127.0.0.1:8200"
     vault login {{ remote_vault_token }}
-    vault kv put secret/jenkins webhook_token="{{ webhook_token }}" webhook_url="{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
+    vault kv put secret/jenkins webhook_token="{{ webhook_token }}" webhook_url="https://{{ jenkins_live_domain }}/job/k8s-automated-dr/job/main/buildWithParameters"
     EOF
   
 - name: Display webhook configuration
   debug:
     msg:
       - "✅ Jenkins webhook registered"
-      - "Webhook URL: {{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
+      - "Webhook URL: {{ jenkins_live_domain }}"
       - "Node.js trigger will handle parameter processing and queuing"
 
 - name: Create application user

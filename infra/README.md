@@ -163,14 +163,15 @@ exactly what the Kubernetes API expects.
 ### Easiest: *Multibranch Pipeline* (auto-discovers branches & PRs)
 
 1. Jenkins dashboard → **New Item**
-2. Name it, pick **Multibranch Pipeline** → OK
-3. In **Branch Sources**:
+2. Name it **k8s-automated-dr**.  <- THIS IS COMPULSORY FOR THE WEBHOOK URL 
+3. pick **Multibranch Pipeline** → OK
+4. In **Branch Sources**:
 
    * **Add source → GitHub**
    * Credentials: choose your `github-pat`
    * Repository https: enter `<repo https clone url>`
-4. 👇 Mode **by Jenkinsfile** and **script-file: Jenkinsfile**.
-5. * Apply and Save
+5. 👇 Mode **by Jenkinsfile** and **script-file: Jenkinsfile**.
+6. * Apply and Save
 
 After **Save** → Jenkins will scan the repo immediately, build any branch with a `Jenkinsfile`, and keep polling via the webhook.
 
