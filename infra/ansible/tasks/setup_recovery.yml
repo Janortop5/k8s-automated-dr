@@ -114,14 +114,23 @@
     group: "{{ app_user }}"
     mode: '0755'
 
-- name: Install Node.js and npm (Ubuntu/Debian)
+- name: Add NodeSource Node.js 18.x APT repository
+  shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+  args:
+    executable: /bin/bash
+
+- name: Install Node.js 18 and npm
   apt:
-    name:
-      - nodejs
-      - npm
+    name: nodejs
     state: present
     update_cache: yes
 
+- name: Install Redis
+  apt:
+    name: redis-server
+    state: present
+    update_cache: yes
+    
 - name: Synchronize trigger application files
   synchronize:
     src: "{{ playbook_dir }}/files/trigger/"
@@ -141,6 +150,23 @@
     state: present
     production: true
   become_user: "{{ app_user }}"
+
+- name: Ensure dotenv is installed
+  npm:
+    name: dotenv
+    path: "{{ app_dir }}"
+    state: present
+  become_user: "{{ app_user }}"
+
+- name: Create .env file from template
+  template:
+    src: "{{ playbook_dir }}/templates/nodejs-trigger.env.j2"
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: "0600"  # Secure permissions for sensitive data
+  notify:
+    - restart {{ app_name }}
 
 - name: Install systemd unit for nodejs-trigger service
   ansible.builtin.copy:
@@ -183,7 +209,7 @@
       WantedBy=multi-user.target
   notify:
     - reload systemd
-    - Restart {{ app_name }}
+    - restart {{ app_name }}
     
 - name: Enable and start Node.js service
   systemd:
@@ -225,7 +251,7 @@
   shell: |
     DOMAIN="trigger.{{ jenkins_public_ip }}.{{ item }}"
     if [ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
-      certbot --nginx --non-interactive --agree-tos \
+      certbot certonly --nginx --non-interactive --agree-tos \
               --email {{ letsencrypt_email }} \
               --redirect \
               -d "${DOMAIN}"

@@ -12,8 +12,8 @@ public_suffixes:
 # Service configuration
 REDIS_HOST: "{{ redis_host | default('localhost') }}"
 REDIS_PORT: "{{ redis_port | default('6379') }}"
-VAULT_ADDR: "{{ vault_address }}"
-VAULT_TOKEN: "{{ vault_token }}"
+VAULT_ADDR: "{{ vault_address  | default('http://127.0.0.1:8200') }}"
+VAULT_TOKEN: "{{ vault_token  |  default('your-tf-vault-token') }}"
 JENKINS_URL: "{{ jenkins_live_domain | default('http://localhost:8080') }}"
 PIPELINE_NAME: "{{ jenkins_pipeline_name | default('k8s-automated-dr') }}"
 BRANCH_NAME: "{{ jenkins_branch_name | default('main') }}"
