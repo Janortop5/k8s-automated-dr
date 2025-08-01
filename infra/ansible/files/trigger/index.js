@@ -259,7 +259,7 @@ class StreamlinedNodeJSTrigger {
 
     async getWebhookFromVault() {
         try {
-            const response = await this.vaultClient.get(`/v1/secret/data/jenkins/${this.config.jenkins.pipeline_name}`);
+            const response = await this.vaultClient.get(`/v1/secret/data/jenkins/`);
             const data = response.data.data.data;
             
             return {

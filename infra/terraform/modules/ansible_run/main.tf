@@ -55,5 +55,3 @@ resource "null_resource" "ansible" {
     EOT
   }
 }
-
-# ${var.local_exec.ansible_playbook.kubeadm} \
