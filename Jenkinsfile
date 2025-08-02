@@ -47,7 +47,7 @@ pipeline {
 
         stage('Lint') {
             when {
-                not { params.SKIP_TESTS }
+                expression { !params.SKIP_TESTS }
             }
             agent {
                 docker { 
@@ -86,7 +86,7 @@ pipeline {
 
         stage('Build & Push') {
             when {
-                not { params.SKIP_TESTS }
+                expression { !params.SKIP_TESTS }
             }
             agent {
                 docker { 
