@@ -12,7 +12,6 @@ jenkins_pkg_name: "jenkins"
 letsencrypt_email: "emmanuelaladejana05@gmail.com"
 jenkins_token_name: "k8s-automated-dr"
 git_repo_url: "https://github.com/Janortop5/k8s-automated-dr.git"
-jenkins_live_domain: "jenkins.{{ jenkins_public_ip }}.nip.io"  ## this is temporary for testing purposes
 
 # Iterate over every suffix until Cerbot succeeds
 public_suffixes:
@@ -20,4 +19,22 @@ public_suffixes:
   - sslip.io
   - traefik.me
 
+kubeconfig_main_path: "{{ playbook_dir }}/kubeconfig-{{ groups['master-node'][0] }}.yaml"
+kubeconfig_agent_path: "{{ playbook_dir }}/jenkins-kubeconfig.yaml"
+ssh_key_path: "{{ playbook_dir }}/../k8s-cluster.pem"
 
+required_plugins:
+  - kubernetes
+  - generic-webhook-trigger
+  - git
+  - docker-workflow
+  - workflow-aggregator
+  - github
+  - aws-credentials
+  - credentials-binding
+  - ssh-agent
+  - prometheus
+
+jenkins_job_name: "k8s-automated-dr"
+git_branch: "*/main"
+jenkinsfile_path: "Jenkinsfile"

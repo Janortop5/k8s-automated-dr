@@ -22,3 +22,7 @@ jenkins_password: "${jenkins_password}"
 # Git credentials
 git_username: "${git_username}"
 git_password: "${git_password}"
+
+# Docker credentials
+docker_username: "${docker_username}"
+docker_password: "${docker_password}"

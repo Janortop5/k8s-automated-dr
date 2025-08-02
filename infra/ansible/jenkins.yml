@@ -1,5 +1,5 @@
 ---
-- hosts: jenkins-server
+- hosts: master-node:jenkins-server
   become: true
   gather_facts: true
   vars_files:
@@ -7,6 +7,30 @@
     - host_vars/nodejs-trigger.yml
     - group_vars/secrets.yml
     - group_vars/all.yml
+
+  pre_tasks:
+    - name: Verify required files exist
+      stat:
+        path: "{{ item }}"
+      register: file_check
+      failed_when: not file_check.stat.exists
+      delegate_to: localhost
+      become: false
+      loop:
+        - "{{ kubeconfig_main_path }}"
+        - "{{ kubeconfig_agent_path }}"
+        - "{{ ssh_key_path }}"
+
+    - name: Verify Vault is accessible
+      uri:
+        url: "{{ remote_vault_address }}/v1/sys/health"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ remote_vault_token }}"
+      become: false
+      delegate_to: localhost
+      register: vault_health
+      failed_when: vault_health.status != 200
 
   tasks:
   - name: Install Docker
@@ -16,6 +40,11 @@
 
   - name: Install Jenkins
     import_tasks: tasks/install_jenkins.yml
+    tags: jenkins
+    when: "'jenkins-server' in group_names"
+
+  - name: Install required Jenkins plugins
+    import_tasks: tasks/install_required_jenkins_plugins.yml
     tags: jenkins
     when: "'jenkins-server' in group_names"
 
@@ -33,6 +62,11 @@
     import_tasks: tasks/setup_recovery.yml
     tags: jenkins
     when: "'jenkins-server' in group_names"
+
+  - name: Update Metrics Collector
+    import_tasks: tasks/update_metrics_collector.yml
+    tags: metrics
+    when: "'master-node' in group_names"
 
   handlers:
     - name: restart jenkins

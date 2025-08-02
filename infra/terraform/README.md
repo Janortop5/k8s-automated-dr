@@ -19,6 +19,8 @@ export jenkins_username='your-jenkins-username'
 export jenkins_password='your-jenkins-password'
 export git_username='your-git-username'
 export git_password='your-git-password'
+export docker_username='your-docker-username'
+export docker_password='your-docker-password'
 ```
 - Create terraform vault docker container.
 ```bash
@@ -47,14 +49,20 @@ docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vau
 
 docker exec -i tf_vault sh << EOF
 export VAULT_ADDR="http://127.0.0.1:8200"
-vault login $vault_token
-vault kv put secret/jenkins jenkins_username=${jenkins_username} jenkins_password=${jenkins_password}
+vault login ${vault_token}
+vault kv put secret/jenkins jenkins_username=${jenkins_username} jenkins_password=${jenkins_password} # \${jenkins_password} if starts with special character. 
 EOF
 
 docker exec -i tf_vault sh << EOF
 export VAULT_ADDR="http://127.0.0.1:8200"
 vault login $vault_token
 vault kv put secret/git_credentials git_username=${git_username} git_password='\${git_password}'
+EOF
+
+docker exec -i tf_vault sh << EOF
+export VAULT_ADDR="http://127.0.0.1:8200"
+vault login $vault_token
+vault kv put secret/docker_credentials docker_username=${docker_username} docker_password='${docker_password}'
 EOF
 ```
 
@@ -71,6 +79,8 @@ export jenkins_username='your-jenkins-username'
 export jenkins_password='your-jenkins-password'
 export git_username='your-git-username'
 export git_password='your-git-password'
+export docker_username='your-docker-username'
+export docker_password='your-docker-password'
 
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/test username='admin' password='1234'"
 
@@ -82,17 +92,42 @@ docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vau
 
 docker exec -i tf_vault sh << EOF
 export VAULT_ADDR="http://127.0.0.1:8200"
-vault login ${vault_token}
-vault kv put secret/jenkins jenkins_username=${jenkins_username} jenkins_password=${jenkins_password}
+vault login $vault_token
+vault kv put secret/jenkins -<<EOJSON
+{
+  "git_username": "$jenkins_username",
+  "git_password": "$jenkins_password"
+}
+EOJSON
 EOF
 
 docker exec -i tf_vault sh << EOF
 export VAULT_ADDR="http://127.0.0.1:8200"
 vault login $vault_token
-vault kv put secret/git_credentials git_username=$git_username git_password=$git_password
+vault kv put secret/git_credentials -<<EOJSON
+{
+  "git_username": "$git_username",
+  "git_password": "$git_password"
+}
+EOJSON
+EOF
+
+docker exec -i tf_vault sh << EOF
+export VAULT_ADDR="http://127.0.0.1:8200"
+vault login $vault_token
+vault kv put secret/docker_credentials -<<EOJSON
+{
+  "docker_username": "$docker_username",
+  "docker_password": "$docker_password"
+}
+EOJSON
 EOF
 ```
 #### Run Terraform
+- First, confirm aws profile and region. i.e.
+```bash
+aws configure # after, click **Enter**, **Enter**, **Enter** **Enter** -> if fields contain non-preferred values add new value before hitting enter.
+```
 - Format, Validate, Initialize and run the Terraform Configuration.
 ```bash
 terraform fmt                       # ensure code is in right format

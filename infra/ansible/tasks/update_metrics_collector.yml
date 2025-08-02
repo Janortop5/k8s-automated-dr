@@ -1,0 +1,68 @@
+---
+# ---------------------------------------------------------------------------
+# Update Metrics Collector with Dynamic Jenkins URL
+# ---------------------------------------------------------------------------
+- name: Create metrics collector directory
+  file:
+    path: "{{ metrics_dir }}"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: '0755'
+
+- name: Generate updated metrics collector manifest
+  template:
+    src: "{{ playbook_dir }}/templates/metrics_collector_deployment.yaml.j2"
+    dest: "{{  metrics_dir }}/metrics_collector_deployment.yml"
+    backup: yes
+  vars:
+    nodejs_trigger_url: https://trigger.{{ jenkins_live_domain }}/trigger
+    jenkins_webhook_url: "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters"
+
+- name: Read main kubeconfig file
+  slurp:
+    src: "{{ kubeconfig_main_path }}"
+  register: main_kubeconfig_file
+  delegate_to: localhost
+  become: false
+  no_log: true
+  when: kubeconfig_main_path is defined
+
+- name: Load kubeconfig file
+  set_fact:
+    kubeconfig_data: "{{ lookup('file', kubeconfig_agent_path) | from_yaml }}"
+
+- name: Read deployment manifest from remote host
+  ansible.builtin.slurp:
+    src: /opt/metrics-collector/k8s-manifests/metrics_collector_deployment.yml
+  register: manifest_raw
+
+- name: Apply updated metrics collector deployment
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ manifest_raw['content'] | b64decode | from_yaml_all | list }}"
+    kubeconfig: "{{ kubeconfig_data }}"
+  register: collector_deployment
+
+- name: Verify metrics collector deployment
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: prometheus-metrics-collector
+    namespace: monitoring
+    kubeconfig: "{{ kubeconfig_data }}"
+  register: collector_status
+  until: >
+    collector_status.resources[0].status.readyReplicas is defined and
+    collector_status.resources[0].status.replicas is defined and
+    collector_status.resources[0].status.readyReplicas == collector_status.resources[0].status.replicas
+  retries: 5
+  delay: 5
+
+- name: Display updated collector configuration
+  debug:
+    msg:
+      - "✅ Metrics Collector Updated Successfully"
+      - "NodeJS Trigger URL: {{ trigger_live_domain }}"
+      - "Jenkins Webhook URL: {{ webhook_url }}"
+      - "Deployment Status: {{ collector_status.resources[0].status.conditions[-1].type }}"

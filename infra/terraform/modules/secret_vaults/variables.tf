@@ -26,8 +26,12 @@ variable "vault_jenkins_path" {
 
 variable "vault_git_path" {
   description = "Path to Git credentials in Vault"
-  default     = "secret/git_credentials"
-  
+  default     = "secret/git_credentials"  
+}
+
+variable "vault_docker_path" {
+  description = "Path to Docker credentials in Vault"
+  default     = "secret/docker_credentials"
 }
 
 variable "environment" {

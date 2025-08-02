@@ -3,6 +3,9 @@ nodejs_version: "18"
 app_name: "nodejs-trigger"
 app_user: "{{ app_name }}"
 app_dir: "/opt/{{ app_name }}"
+
+metrics_dir: "/opt/metrics-collector/k8s-manifests"
+
 service_port: 3000
 letsencrypt_email: "emmanuelaladejana05@gmail.com"
 public_suffixes:

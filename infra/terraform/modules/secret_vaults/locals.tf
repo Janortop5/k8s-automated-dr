@@ -24,6 +24,10 @@ data "vault_generic_secret" "git_secrets" {
   path = var.vault_git_path
 }
 
+data "vault_generic_secret" "docker_secrets" {
+  path = var.vault_docker_path
+}
+
 # Create the secrets YAML content
 locals {
   secrets_content = {
@@ -37,5 +41,7 @@ locals {
     jenkins_password                = data.vault_generic_secret.jenkins_secrets.data["jenkins_password"]
     git_username                    = data.vault_generic_secret.git_secrets.data["git_username"]
     git_password                    = data.vault_generic_secret.git_secrets.data["git_password"]
+    docker_username                 = data.vault_generic_secret.docker_secrets.data["docker_username"]
+    docker_password                 = data.vault_generic_secret.docker_secrets.data["docker_password"]
   }
 }

@@ -1,0 +1,110 @@
+- name: Read initial admin password
+  ansible.builtin.slurp:
+    src: /var/lib/jenkins/secrets/initialAdminPassword
+  register: initial_pw
+  run_once: true
+
+- name: Cache admin password fact
+  ansible.builtin.set_fact:
+    jenkins_admin_password: "{{ initial_pw.content | b64decode | trim }}"
+
+# ---------------------------------------------------------------------------
+# Install Required and Recommended Plugins
+# ---------------------------------------------------------------------------
+- name: Install comprehensive Jenkins plugin set
+  community.general.jenkins_plugin:
+    name: "{{ item }}"
+    state: latest
+    url: "http://localhost:8080"
+    url_username: admin
+    url_password: "{{ jenkins_admin_password }}"
+    with_dependencies: true
+    timeout: 300
+  loop:
+    # Authentication & Security
+    - openid-connect
+    - role-strategy
+    - matrix-auth
+    
+    # SCM & Git
+    - git
+    - github
+    - github-branch-source
+    - bitbucket
+    - gitlab-plugin
+    
+    # Pipeline & Build
+    - workflow-aggregator  # Pipeline plugin suite
+    - pipeline-stage-view
+    - pipeline-graph-analysis
+    - build-pipeline-plugin
+    - conditional-buildstep
+    
+    # Kubernetes Integration
+    - kubernetes
+    - kubernetes-client-api
+    - kubernetes-credentials
+    - kubernetes-cli
+    
+    # Docker Integration  
+    - docker-workflow
+    - docker-plugin
+    - docker-build-step
+    
+    # Webhook & Triggers
+    - generic-webhook-trigger
+    - build-token-root
+    - webhook-step
+    
+    # AWS Integration
+    - aws-credentials
+    - aws-global-configuration
+    - aws-java-sdk
+    
+    # Monitoring & Reporting
+    - prometheus
+    - monitoring
+    - build-monitor-plugin
+    - dashboard-view
+    
+    # Utility Plugins
+    - credentials-binding
+    - ssh-agent
+    - ssh-credentials
+    - plain-credentials
+    - timestamper
+    - ws-cleanup
+    - build-timeout
+    - ant
+    - gradle
+    - maven-plugin
+    - dark-theme
+    - theme-manager
+    - ldap
+    - pipeline-graph-view
+    - pipeline-github-groovy-libraries
+    - pipeline-groovy-libraries
+    
+    # Notification
+    - email-ext
+    - slack
+    - http_request
+    
+    # Additional Useful Plugins
+    - parameterized-trigger  
+    - copyartifact
+    - publish-over-ssh
+    - ansicolor
+    - configuration-as-code
+  register: plugin_installation
+  notify: restart jenkins
+
+- name: Wait for Jenkins to restart after plugin installation
+  ansible.builtin.uri:
+    url: "http://localhost:8080/login"
+    status_code: 200
+  register: jenkins_restart_status
+  retries: 20
+  delay: 30
+  until: jenkins_restart_status.status == 200
+  when: plugin_installation.changed

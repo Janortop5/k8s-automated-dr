@@ -50,7 +50,12 @@
     docker exec -i tf_vault sh << EOF
     export VAULT_ADDR="http://127.0.0.1:8200"
     vault login {{ remote_vault_token }}
-    vault kv put secret/jenkins jenkins_username="{{ jenkins_username }}" jenkins_password="{{ jenkins_password }}"
+    vault kv put secret/docker_credentials -<<EOJSON
+    {
+      "jenkins_username": "{{ jenkins_username }}",
+      "jenkins_password": "{{ jenkins_password }}"
+    }
+    EOJSON
     EOF
   register: jenkins_result
 
@@ -59,9 +64,28 @@
     docker exec -i tf_vault sh << EOF
     export VAULT_ADDR="http://127.0.0.1:8200"
     vault login {{ remote_vault_token }}
-    vault kv put secret/git_credentials git_username="{{ git_username }}" git_password="\{{ git_password }}"
+    vault kv put secret/git_credentials -<<EOJSON
+    {
+      "git_username": "{{ git_username }}",
+      "git_password": "{{ git_password }}"
+    }
+    EOJSON
     EOF
   register: git_result
+
+- name: Store docker credentials
+  shell: |
+    docker exec -i tf_vault sh << EOF
+    export VAULT_ADDR="http://127.0.0.1:8200"
+    vault login {{ remote_vault_token }}
+    vault kv put secret/docker_credentials -<<EOJSON
+    {
+      "docker_username": "{{ docker_username }}",
+      "docker_password": "{{ docker_password }}"
+    }
+    EOJSON
+    EOF
+  register: docker_result
 
 - name: Display setup status
   debug:

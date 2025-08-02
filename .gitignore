@@ -11,6 +11,9 @@
 **/docs
 **/hosts
 
+# environment variables
+*.env
+
 # Terraform directories
 **/.terraform/
 

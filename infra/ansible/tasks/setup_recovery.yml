@@ -1,8 +1,8 @@
-- name: Generate Jenkins webhook token
+- name: Generate secure webhook token with timestamp
   set_fact:
-    webhook_token: "{{ ansible_date_time.epoch }}{{ 999999999 | random }}"
+    webhook_token: "{{ ansible_date_time.epoch }}-{{ 999999999 | random }}-{{ ansible_hostname | hash('sha256') | truncate(8, true, '') }}"
       
-- name: Execute Jenkins job creation script
+- name: Create webhook job with proper Generic Webhook Trigger configuration
   uri:
     url: "https://{{ jenkins_live_domain }}/scriptText"
     method: POST
@@ -23,6 +23,11 @@
         import org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty
         import org.jenkinsci.plugins.gwt.GenericTrigger
         import org.jenkinsci.plugins.gwt.GenericVariable
+        import org.jenkinsci.plugins.gwt.GenericRequestVariable
+        import org.jenkinsci.plugins.gwt.GenericHeaderVariable
+        import hudson.model.StringParameterDefinition
+        import hudson.model.ParametersDefinitionProperty
+        import hudson.model.BooleanParameterDefinition
         
         def jenkins = Jenkins.instance
         def jobName = "{{ jenkins_job_name | default('k8s-automated-dr') }}"
@@ -31,14 +36,28 @@
         def existingJob = jenkins.getItem(jobName)
         if (existingJob != null) {
             existingJob.delete()
+            println("🗑️  Deleted existing job: ${jobName}")
         }
         
         // Create new pipeline job
         def job = jenkins.createProject(WorkflowJob, jobName)
-        job.description = "DR Pipeline with Webhook Trigger"
+        job.description = "Automated DR Pipeline with Enhanced Webhook Trigger"
+        
+        // Add parameters to the job
+        def parameterDefinitions = [
+            new BooleanParameterDefinition('DEPLOY_STANDBY_ONLY', false, 'Deploy standby environment only'),
+            new BooleanParameterDefinition('DESTROY_AFTER_APPLY', false, 'Destroy resources after apply'),
+            new BooleanParameterDefinition('SKIP_TESTS', false, 'Skip running tests'),
+            new StringParameterDefinition('TRIGGERED_BY', 'manual', 'Source of trigger'),
+            new StringParameterDefinition('ALERT_TYPE', 'cpu', 'Type of alert that triggered this job')
+        ]
+        
+        def parametersProperty = new ParametersDefinitionProperty(parameterDefinitions)
+        job.addProperty(parametersProperty)
         
         // Configure Git SCM
-        def gitSCM = new GitSCM([new UserRemoteConfig("{{ git_repo_url }}", "{{ git_credentials_id | default('') }}")])
+        def userRemoteConfigs = [new UserRemoteConfig("{{ git_repo_url }}", "git-credentials")]
+        def gitSCM = new GitSCM(userRemoteConfigs)
         gitSCM.branches = [new BranchSpec("{{ git_branch | default('*/main') }}")]
         
         // Set pipeline definition from SCM
@@ -46,22 +65,36 @@
         flowDefinition.lightweight = true
         job.definition = flowDefinition
         
-        // Configure webhook trigger
+        // Configure Generic Webhook Trigger with detailed variable extraction
         def genericVariables = [
-            new GenericVariable("DEPLOY_STANDBY_ONLY", "\$.parameters.deploy_standby_only", "JSONPath", "false"),
-            new GenericVariable("DESTROY_AFTER_APPLY", "\$.parameters.destroy_after_apply", "JSONPath", "false"),
-            new GenericVariable("SKIP_TESTS", "\$.parameters.skip_tests", "JSONPath", "false")
+            new GenericVariable("DEPLOY_STANDBY_ONLY", "\$.deploy_standby_only", "JSONPath", "false"),
+            new GenericVariable("DESTROY_AFTER_APPLY", "\$.destroy_after_apply", "JSONPath", "false"), 
+            new GenericVariable("SKIP_TESTS", "\$.skip_tests", "JSONPath", "false"),
+            new GenericVariable("TRIGGERED_BY", "\$.triggered_by", "JSONPath", "webhook"),
+            new GenericVariable("ALERT_TYPE", "\$.alert_type", "JSONPath", "cpu"),
+            new GenericVariable("ALERT_VALUE", "\$.alert_value", "JSONPath", "0"),
+            new GenericVariable("TIMESTAMP", "\$.timestamp", "JSONPath", "")
+        ]
+        
+        def genericRequestVariables = [
+            new GenericRequestVariable("REQUEST_METHOD", "REQUEST_METHOD")
+        ]
+        
+        def genericHeaderVariables = [
+            new GenericHeaderVariable("CONTENT_TYPE", "Content-Type")
         ]
         
         def genericTrigger = new GenericTrigger(
             genericVariables,
-            "",  // regexFilter
-            "",  // regexFilterText
+            "",  // regexFilter - empty means accept all
+            "",  // regexFilterText  
             "{{ webhook_token }}",  // token
             true,  // printContributedVariables
             true,  // printPostContent
             false, // silentResponse
-            false  // shouldNotFlatten
+            false, // shouldNotFlatten
+            genericRequestVariables,
+            genericHeaderVariables
         )
         
         def triggerProperty = new PipelineTriggersJobProperty([genericTrigger])
@@ -70,25 +103,53 @@
         // Save the job
         job.save()
         
-        println("Pipeline job '${jobName}' created successfully")
+        println("✅ Enhanced pipeline job '${jobName}' created successfully")
+        println("🔗 Webhook URL: https://{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}")
     status_code: [200]
     validate_certs: no
   register: job_creation_result
+
 
 - name: Store webhook configuration in Vault
   shell: |
     docker exec -i tf_vault sh << EOF
     export VAULT_ADDR="http://127.0.0.1:8200"
     vault login {{ remote_vault_token }}
-    vault kv put secret/jenkins webhook_token="{{ webhook_token }}" webhook_url="https://{{ jenkins_live_domain }}/job/k8s-automated-dr/job/main/buildWithParameters"
+    vault kv put secret/jenkins_webhook -<<EOJSON
+    {
+      "webhook_token": "{{ webhook_token }}",
+      "webhook_url": "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters",
+      "jenkins_job_url": "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/",
+      "trigger_domain": "https://trigger.{{ jenkins_live_domain }}/trigger"
+    }
+    EOJSON
     EOF
-  
-- name: Display webhook configuration
+
+- name: Test webhook token functionality
+  uri:
+    url: "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      deploy_standby_only: false
+      destroy_after_apply: false
+      skip_tests: true
+      triggered_by: "ansible-test"
+      alert_type: "test"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+    status_code: [200, 201]
+  register: webhook_test
+  ignore_errors: true
+
+- name: Display webhook test results
   debug:
     msg:
-      - "✅ Jenkins webhook registered"
-      - "Webhook URL: {{ jenkins_live_domain }}"
-      - "Node.js trigger will handle parameter processing and queuing"
+      - "🧪 Webhook Test Results:"
+      - "Status: {{ webhook_test.status | default('Failed') }}"
+      - "Token: {{ webhook_token }}"
+      - "URL: https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/"
 
 - name: Create application user
   user:
@@ -235,12 +296,12 @@
       - "User: {{ app_user }}"
       - ""
       - "🔗 Endpoints:"
-      - "  Health Check: http://{{ ansible_host }}/health"
-      - "  Trigger: POST http://{{ ansible_host }}/trigger"
-      - "  Queue Status: http://{{ ansible_host }}/queue/status"
+      - "  Health Check: http://trigger.{{ jenkins_live_domain }}/health"
+      - "  Trigger: POST http://trigger.{{ jenkins_live_domain }}/trigger"
+      - "  Queue Status: http://trigger.{{ jenkins_live_domain }}/queue/status"
       - ""
       - "📝 Test with:"
-      - "curl -X POST http://{{ ansible_host }}/trigger \\"
+      - "curl -X POST http://trigger.{{ jenkins_live_domain }}/trigger \\"
       - "  -H 'Content-Type: application/json' \\"
       - "  -d '{\"parameters\":{\"deploy_standby_only\":\"true\"}}'"
 
@@ -262,12 +323,13 @@
   failed_when: false
   loop: "{{ public_suffixes }}"
   loop_control:
-    label: "trigger.{{ app_public_ip }}.{{ item }}"
+    label: "trigger.{{ jenkins_public_ip }}.{{ item }}"
   notify: reload nginx
 
 - name: Record successful domain for nodejs-trigger
   set_fact:
-    trigger_live_domain: "trigger.{{ jenkins_public_ip }}.{{ item.item }}"
+    certbot_obtained: true
+    trigger_live_domain: "{{ item.item | ternary('trigger.' ~ jenkins_public_ip ~ '.' ~ item.item, '') }}"
   when: item.rc is defined and item.rc == 0
   loop: "{{ certbot_trigger_attempts.results }}"
 
@@ -341,3 +403,21 @@
     dest: /etc/nginx/sites-enabled/nodejs-http.conf
     state: link
   notify: reload nginx
+
+- name: Get webhook configuration from Vault
+  uri:
+    url: "{{ remote_vault_address }}/v1/secret/data/{{ item }}"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ remote_vault_token }}"
+    return_content: yes
+  register: webhook_config
+  loop:
+    - jenkins_webhook
+  loop_control:
+    label: "{{ item }}"
+
+- name: Set credential facts from Vault
+  set_fact:
+    webhook_url: "{{ (webhook_config.results | selectattr('item', 'equalto', 'jenkins_webhook') | first).json.data.data.webhook_url }}"
+    trigger_domain: "{{ (webhook_config.results | selectattr('item', 'equalto', 'jenkins_webhook') | first).json.data.data.trigger_domain }}"

@@ -312,23 +312,7 @@
         println("Credentials created successfully")
 
 # ---------------------------------------------------------------------------
-# 7.  Install required Jenkins plugins
-# ---------------------------------------------------------------------------
-- name: Install OpenID-Connect and Role-Strategy plugins
-  community.general.jenkins_plugin:
-    name: "{{ item }}"
-    state: latest
-    url: "http://localhost:8080"
-    url_username: admin
-    url_password: "{{ jenkins_admin_password }}"
-    with_dependencies: true
-  loop:
-    - openid-connect
-    - role-strategy
-  notify: restart jenkins
-
-# ---------------------------------------------------------------------------
-# 8.  Drop Groovy init script
+# 7.  Drop Groovy init script
 # ---------------------------------------------------------------------------
 - name: Ensure init.groovy.d exists
   ansible.builtin.file:
@@ -346,3 +330,161 @@
     group: jenkins
     mode: "0644"
   notify: restart jenkins
+
+# ---------------------------------------------------------------------------
+# 8.  Enhanced Credential Management
+# ---------------------------------------------------------------------------
+- name: Get all credentials from Vault for Jenkins
+  uri:
+    url: "{{ remote_vault_address }}/v1/secret/data/{{ item }}"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ remote_vault_token }}"
+    return_content: yes
+  register: vault_credentials
+  loop:
+    - git_credentials
+    - aws
+    - velero
+    - jenkins
+    - docker_credentials
+  no_log: true
+  loop_control:
+    label: "{{ item }}"
+
+- name: Set credential facts from Vault
+  no_log: true
+  set_fact:
+    git_username: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'git_credentials') | first).json.data.data.git_username }}"
+    git_password: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'git_credentials') | first).json.data.data.git_password }}"
+    aws_access_key: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'aws') | first).json.data.data.access_key }}"
+    aws_secret_key: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'aws') | first).json.data.data.secret_key }}"
+    backup_bucket: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'velero') | first).json.data.data.bucket_name }}"
+    backup_bucket_region: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'velero') | first).json.data.data.region }}"
+    docker_username: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'docker_credentials') | first).json.data.data.docker_username }}"
+    docker_password: "{{ (vault_credentials.results | selectattr('item', 'equalto', 'docker_credentials') | first).json.data.data.docker_password }}"
+
+- name: Read SSH private key for credentials
+  slurp:
+    src: "{{ ssh_key_path | default('{{ playbook_dir }}/../k8s-cluster.pem') }}"
+  delegate_to: localhost
+  register: ssh_key_content
+  become: false
+  when: ssh_key_path is defined
+  no_log: true
+
+- name: Create comprehensive Jenkins credentials via Groovy
+  uri:
+    url: "https://{{ jenkins_live_domain }}/scriptText"
+    method: POST
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+    headers:
+      Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
+    body_format: form-urlencoded
+    body:
+      script: |
+        {{ lookup('file', 'files/jenkins/create-credentials.groovy') | 
+           replace('${GIT_USERNAME}', git_username) |
+           replace('${GIT_PASSWORD}', git_password) |
+           replace('${DOCKER_USERNAME}', docker_username | default('your-docker-user')) |
+           replace('${DOCKER_PASSWORD}', docker_password | default('your-docker-pass')) |
+           replace('${AWS_ACCESS_KEY}', aws_access_key) |
+           replace('${AWS_SECRET_KEY}', aws_secret_key) |
+           replace('${BACKUP_BUCKET}', backup_bucket) |
+           replace('${BACKUP_BUCKET_REGION}', backup_bucket_region) |
+           replace('${SSH_PRIVATE_KEY}', ssh_key_content.content | b64decode) }}
+    status_code: [200]
+  no_log: true
+  register: credentials_result
+
+- name: Read main kubeconfig file
+  slurp:
+    src: "{{ kubeconfig_main_path }}"
+  register: main_kubeconfig_file
+  delegate_to: localhost
+  become: false
+  no_log: true
+  when: kubeconfig_main_path is defined
+
+- name: Load kubeconfig file
+  set_fact:
+    kubeconfig_data: "{{ lookup('file', kubeconfig_agent_path) | from_yaml }}"
+
+- name: Extract Kubernetes server URL
+  set_fact:
+    k8s_server_url: "{{ kubeconfig_data.clusters[0].cluster.server }}"
+
+- name: Read Jenkins agent kubeconfig file  
+  slurp:
+    src: "{{ kubeconfig_agent_path }}"
+  register: agent_kubeconfig_file
+  delegate_to: localhost
+  become: false
+  no_log: true
+  when: kubeconfig_agent_path is defined
+
+- name: Load kubeconfig file
+  delegate_to: localhost
+  become: false
+  no_log: true
+  set_fact:
+    kubeconfig_data: "{{ lookup('file', kubeconfig_agent_path) | from_yaml }}"
+
+- name: Extract Kubernetes server URL
+  set_fact:
+    k8s_server_url: "{{ kubeconfig_data.clusters[0].cluster.server }}"
+
+
+- name: Add Kubeconfig credentials to Jenkins
+  uri:
+    url: "https://{{ jenkins_live_domain }}/scriptText"
+    method: POST
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+    headers:
+      Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
+    body_format: form-urlencoded
+    body:
+      script: |
+        {{ lookup('file', 'files/jenkins/add-kubeconfig.groovy') |
+           replace('${MAIN_KUBECONFIG_FILENAME}', 'kubeconfig-' + ansible_default_ipv4.address + '.yaml') |
+           replace('${MAIN_KUBECONFIG_CONTENT}', main_kubeconfig_file.content | b64decode) |
+           replace('${AGENT_KUBECONFIG_CONTENT}', agent_kubeconfig_file.content | b64decode) }}
+    status_code: [200]
+  no_log: true
+  when: main_kubeconfig_file is defined and agent_kubeconfig_file is defined
+
+# ---------------------------------------------------------------------------
+# 9.  Configure Kubernetes Cloud
+# ---------------------------------------------------------------------------
+
+- name: Get Jenkins private IP for tunnel configuration
+  set_fact:
+    jenkins_tunnel_url: "{{ jenkins_private_ip }}:50000"
+
+- name: Configure Kubernetes Cloud in Jenkins
+  uri:
+    url: "https://{{ jenkins_live_domain }}/scriptText"
+    method: POST
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+    headers:
+      Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
+    body_format: form-urlencoded
+    body:
+      script: |
+        {{ lookup('file', 'files/jenkins/configure-k8s-cloud.groovy') |
+           replace('${CLOUD_NAME}', 'k8s-automated-dr') |
+           replace('${K8S_SERVER_URL}', '{{ k8s_server_url }}') |
+           replace('${K8S_NAMESPACE}', 'jenkins') |
+           replace('${JENKINS_URL}', 'https://{{ jenkins_live_domain }}') |
+           replace('${JENKINS_TUNNEL}', '{{ jenkins_tunnel_url }}') |
+           replace('${CREDENTIALS_ID}', 'k8s-jenkins-agent') |
+           replace('${CONTAINER_CAP}', '10') }}
+    status_code: [200]
+  register: k8s_cloud_config
+  when: k8s_server_url is defined

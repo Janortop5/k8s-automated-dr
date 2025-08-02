@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-metrics-collector
+  labels:
+    app: metrics-collector
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics-collector
+  template:
+    metadata:
+      labels:
+        app: metrics-collector
+    spec:
+      serviceAccountName: metrics-collector
+      containers:
+      - name: metrics-collector
+        image: freshinit/metrics-collector:latest
+        env:
+        - name: PROMETHEUS_URL
+          value: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+        - name: MODEL_ENDPOINT
+          value: "http://lstm-model-service.monitoring.svc.cluster.local/predict"
+        - name: COLLECTION_INTERVAL
+          value: "30"
+        - name: SEQUENCE_LENGTH
+          value: "1"
+        - name: USE_TIME_SERIES
+          value: "false"
+        - name: ALERT_COOLDOWN_SECONDS
+          value: "900"
+        - name: API_GATEWAY_URL
+          value: "{{ nodejs_trigger_url }}"  # Dynamic NodeJS trigger URL
+        - name: JENKINS_WEBHOOK_URL
+          value: "{{ jenkins_webhook_url }}"  # Backup direct Jenkins webhook
+        - name: ALERT_CPU_THRESHOLD
+          value: "30"
+        # Authentication for Jenkins webhook (if needed)
+        - name: JENKINS_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: jenkins-webhook-auth
+              key: token
+              optional: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import requests; requests.get('http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up', timeout=5)"
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import requests; requests.get('http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up', timeout=5)"
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-collector
+  namespace: monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metrics-collector
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metrics-collector
+subjects:
+- kind: ServiceAccount
+  name: metrics-collector
+  namespace: monitoring
+
+---
+# Optional: Jenkins webhook authentication secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jenkins-webhook-auth
+  namespace: monitoring
+type: Opaque
+data:
+  token: "{{ (jenkins_webhook_token | default('')) | b64encode }}"  # Base64 encoded webhook token
