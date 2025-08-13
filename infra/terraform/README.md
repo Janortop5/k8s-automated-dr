@@ -49,20 +49,35 @@ docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vau
 
 docker exec -i tf_vault sh << EOF
 export VAULT_ADDR="http://127.0.0.1:8200"
-vault login ${vault_token}
-vault kv put secret/jenkins jenkins_username=${jenkins_username} jenkins_password=${jenkins_password} # \${jenkins_password} if starts with special character. 
+vault login $vault_token
+vault kv put secret/jenkins -<<EOJSON
+{
+  "jenkins_username": "$jenkins_username",
+  "jenkins_password": "$jenkins_password"
+}
+EOJSON
 EOF
 
 docker exec -i tf_vault sh << EOF
 export VAULT_ADDR="http://127.0.0.1:8200"
 vault login $vault_token
-vault kv put secret/git_credentials git_username=${git_username} git_password='\${git_password}'
+vault kv put secret/git_credentials -<<EOJSON
+{
+  "git_username": "$git_username",
+  "git_password": "$git_password"
+}
+EOJSON
 EOF
 
 docker exec -i tf_vault sh << EOF
 export VAULT_ADDR="http://127.0.0.1:8200"
 vault login $vault_token
-vault kv put secret/docker_credentials docker_username=${docker_username} docker_password='${docker_password}'
+vault kv put secret/docker_credentials -<<EOJSON
+{
+  "docker_username": "$docker_username",
+  "docker_password": "$docker_password"
+}
+EOJSON
 EOF
 ```
 
@@ -95,8 +110,8 @@ export VAULT_ADDR="http://127.0.0.1:8200"
 vault login $vault_token
 vault kv put secret/jenkins -<<EOJSON
 {
-  "git_username": "$jenkins_username",
-  "git_password": "$jenkins_password"
+  "jenkins_username": "$jenkins_username",
+  "jenkins_password": "$jenkins_password"
 }
 EOJSON
 EOF

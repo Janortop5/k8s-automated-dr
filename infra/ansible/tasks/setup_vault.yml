@@ -6,6 +6,7 @@
       -p 8200:8200 \
       hashicorp/vault:latest
   register: vault_start
+  ignore_errors: true
   failed_when: vault_start.rc != 0 and "already in use" not in vault_start.stderr
 
 - name: Wait for Vault to initialize
@@ -50,7 +51,7 @@
     docker exec -i tf_vault sh << EOF
     export VAULT_ADDR="http://127.0.0.1:8200"
     vault login {{ remote_vault_token }}
-    vault kv put secret/docker_credentials -<<EOJSON
+    vault kv put secret/jenkins -<<EOJSON
     {
       "jenkins_username": "{{ jenkins_username }}",
       "jenkins_password": "{{ jenkins_password }}"

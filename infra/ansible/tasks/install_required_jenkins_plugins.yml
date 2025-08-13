@@ -1,12 +1,23 @@
-- name: Read initial admin password
+# ---------------------------------------------------------------------------
+# Ensure jenkins_admin_password is available (read if not cached)
+# ---------------------------------------------------------------------------
+- name: Read initial admin password (if not already cached)
   ansible.builtin.slurp:
     src: /var/lib/jenkins/secrets/initialAdminPassword
-  register: initial_pw
-  run_once: true
+  register: initial_pw_temp
+  when: jenkins_admin_password is not defined
 
-- name: Cache admin password fact
+- name: Cache admin password fact (if not already cached)
   ansible.builtin.set_fact:
-    jenkins_admin_password: "{{ initial_pw.content | b64decode | trim }}"
+    jenkins_admin_password: "{{ initial_pw_temp.content | b64decode | trim }}"
+  when: 
+    - jenkins_admin_password is not defined
+    - initial_pw_temp.content is defined
+
+- name: Verify jenkins_admin_password is available
+  ansible.builtin.fail:
+    msg: "Could not obtain Jenkins admin password. Check if /var/lib/jenkins/secrets/initialAdminPassword exists and Jenkins is properly initialized."
+  when: jenkins_admin_password is not defined or jenkins_admin_password | length == 0
 
 # ---------------------------------------------------------------------------
 # Install Required and Recommended Plugins

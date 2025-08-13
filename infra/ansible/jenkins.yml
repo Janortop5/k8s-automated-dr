@@ -43,18 +43,18 @@
     tags: jenkins
     when: "'jenkins-server' in group_names"
 
-  - name: Install required Jenkins plugins
-    import_tasks: tasks/install_required_jenkins_plugins.yml
-    tags: jenkins
-    when: "'jenkins-server' in group_names"
-
   - name: Setup Vault Container
     import_tasks: tasks/setup_vault.yml
     tags: vault
     when: "'jenkins-server' in group_names"
-
+    
   - name: Setup Jenkins dependencies
     import_tasks: tasks/install_extra_jenkins_settings.yml
+    tags: jenkins
+    when: "'jenkins-server' in group_names"
+
+  - name: Install required Jenkins plugins
+    import_tasks: tasks/install_required_jenkins_plugins.yml
     tags: jenkins
     when: "'jenkins-server' in group_names"
 

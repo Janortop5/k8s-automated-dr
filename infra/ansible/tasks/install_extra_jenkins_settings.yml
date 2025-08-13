@@ -72,7 +72,7 @@
   notify: reload nginx
 
 - name: Record winning domain (if any)
-  set_fact:
+  ansible.builtin.set_fact:
     cert_obtained: true
     jenkins_live_domain: "{{ item.item | ternary('jenkins.' ~ jenkins_public_ip ~ '.' ~ item.item, '') }}"
   when: item.rc is defined and item.rc == 0
@@ -180,12 +180,19 @@
 - name: Read initial admin password
   ansible.builtin.slurp:
     src: /var/lib/jenkins/secrets/initialAdminPassword
-  register: initial_pw
-  run_once: true
+  register: initial_pw_temp
 
 - name: Cache admin password fact
   ansible.builtin.set_fact:
-    jenkins_admin_password: "{{ initial_pw.content | b64decode | trim }}"
+    jenkins_admin_password: "{{ initial_pw_temp.content | b64decode | trim }}"
+  when: 
+    - jenkins_admin_password is not defined
+    - initial_pw_temp.content is defined
+
+- name: Verify jenkins_admin_password is available
+  ansible.builtin.fail:
+    msg: "Could not obtain Jenkins admin password. Check if /var/lib/jenkins/secrets/initialAdminPassword exists and Jenkins is properly initialized."
+  when: jenkins_admin_password is not defined or jenkins_admin_password | length == 0
 
 - name: Wait for Jenkins login page to respond
   ansible.builtin.uri:

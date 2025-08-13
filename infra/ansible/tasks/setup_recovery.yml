@@ -1,147 +1,87 @@
-- name: Generate secure webhook token with timestamp
-  set_fact:
-    webhook_token: "{{ ansible_date_time.epoch }}-{{ 999999999 | random }}-{{ ansible_hostname | hash('sha256') | truncate(8, true, '') }}"
-      
-- name: Create webhook job with proper Generic Webhook Trigger configuration
+- name: Create dedicated webhook Personal Access Token
   uri:
-    url: "https://{{ jenkins_live_domain }}/scriptText"
+    url: "https://{{ jenkins_live_domain }}/me/descriptorByName/jenkins.security.ApiTokenProperty/generateNewToken"
     method: POST
     user: "{{ jenkins_username }}"
     password: "{{ jenkins_api_token }}"
     force_basic_auth: yes
     headers:
       Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
+      Content-Type: "application/x-www-form-urlencoded"
     body_format: form-urlencoded
     body:
-      script: |
-        import jenkins.model.*
-        import org.jenkinsci.plugins.workflow.job.WorkflowJob
-        import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
-        import hudson.plugins.git.GitSCM
-        import hudson.plugins.git.BranchSpec
-        import hudson.plugins.git.UserRemoteConfig
-        import org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty
-        import org.jenkinsci.plugins.gwt.GenericTrigger
-        import org.jenkinsci.plugins.gwt.GenericVariable
-        import org.jenkinsci.plugins.gwt.GenericRequestVariable
-        import org.jenkinsci.plugins.gwt.GenericHeaderVariable
-        import hudson.model.StringParameterDefinition
-        import hudson.model.ParametersDefinitionProperty
-        import hudson.model.BooleanParameterDefinition
-        
-        def jenkins = Jenkins.instance
-        def jobName = "{{ jenkins_job_name | default('k8s-automated-dr') }}"
-        
-        // Delete existing job if it exists
-        def existingJob = jenkins.getItem(jobName)
-        if (existingJob != null) {
-            existingJob.delete()
-            println("🗑️  Deleted existing job: ${jobName}")
-        }
-        
-        // Create new pipeline job
-        def job = jenkins.createProject(WorkflowJob, jobName)
-        job.description = "Automated DR Pipeline with Enhanced Webhook Trigger"
-        
-        // Add parameters to the job
-        def parameterDefinitions = [
-            new BooleanParameterDefinition('DEPLOY_STANDBY_ONLY', false, 'Deploy standby environment only'),
-            new BooleanParameterDefinition('DESTROY_AFTER_APPLY', false, 'Destroy resources after apply'),
-            new BooleanParameterDefinition('SKIP_TESTS', false, 'Skip running tests'),
-            new StringParameterDefinition('TRIGGERED_BY', 'manual', 'Source of trigger'),
-            new StringParameterDefinition('ALERT_TYPE', 'cpu', 'Type of alert that triggered this job')
-        ]
-        
-        def parametersProperty = new ParametersDefinitionProperty(parameterDefinitions)
-        job.addProperty(parametersProperty)
-        
-        // Configure Git SCM
-        def userRemoteConfigs = [new UserRemoteConfig("{{ git_repo_url }}", "git-credentials")]
-        def gitSCM = new GitSCM(userRemoteConfigs)
-        gitSCM.branches = [new BranchSpec("{{ git_branch | default('*/main') }}")]
-        
-        // Set pipeline definition from SCM
-        def flowDefinition = new CpsScmFlowDefinition(gitSCM, "{{ jenkinsfile_path | default('Jenkinsfile') }}")
-        flowDefinition.lightweight = true
-        job.definition = flowDefinition
-        
-        // Configure Generic Webhook Trigger with detailed variable extraction
-        def genericVariables = [
-            new GenericVariable("DEPLOY_STANDBY_ONLY", "\$.deploy_standby_only", "JSONPath", "false"),
-            new GenericVariable("DESTROY_AFTER_APPLY", "\$.destroy_after_apply", "JSONPath", "false"), 
-            new GenericVariable("SKIP_TESTS", "\$.skip_tests", "JSONPath", "false"),
-            new GenericVariable("TRIGGERED_BY", "\$.triggered_by", "JSONPath", "webhook"),
-            new GenericVariable("ALERT_TYPE", "\$.alert_type", "JSONPath", "cpu"),
-            new GenericVariable("ALERT_VALUE", "\$.alert_value", "JSONPath", "0"),
-            new GenericVariable("TIMESTAMP", "\$.timestamp", "JSONPath", "")
-        ]
-        
-        def genericRequestVariables = [
-            new GenericRequestVariable("REQUEST_METHOD", "REQUEST_METHOD")
-        ]
-        
-        def genericHeaderVariables = [
-            new GenericHeaderVariable("CONTENT_TYPE", "Content-Type")
-        ]
-        
-        def genericTrigger = new GenericTrigger(
-            genericVariables,
-            "",  // regexFilter - empty means accept all
-            "",  // regexFilterText  
-            "{{ webhook_token }}",  // token
-            true,  // printContributedVariables
-            true,  // printPostContent
-            false, // silentResponse
-            false, // shouldNotFlatten
-            genericRequestVariables,
-            genericHeaderVariables
-        )
-        
-        def triggerProperty = new PipelineTriggersJobProperty([genericTrigger])
-        job.addProperty(triggerProperty)
-        
-        // Save the job
-        job.save()
-        
-        println("✅ Enhanced pipeline job '${jobName}' created successfully")
-        println("🔗 Webhook URL: https://{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}")
+      newTokenName: "webhook-dr-{{ ansible_date_time.epoch }}"
+      newTokenDescription: "Token for DR webhook automation created on {{ ansible_date_time.iso8601 }}"
     status_code: [200]
     validate_certs: no
-  register: job_creation_result
+    return_content: yes
+  register: jenkins_pat_result
 
+- name: Extract Personal Access Token
+  set_fact:
+    webhook_token: "{{ jenkins_pat_result.json.tokenValue }}"
+    webhook_token_uuid: "{{ jenkins_pat_result.json.tokenUuid }}"
+  when: jenkins_pat_result.json.tokenValue is defined
 
-- name: Store webhook configuration in Vault
+- name: Store Jenkins webhook token
   shell: |
     docker exec -i tf_vault sh << EOF
     export VAULT_ADDR="http://127.0.0.1:8200"
     vault login {{ remote_vault_token }}
-    vault kv put secret/jenkins_webhook -<<EOJSON
+    vault kv put secret/jenkins_webhook_token -<<EOJSON
     {
-      "webhook_token": "{{ webhook_token }}",
+      "token": "{{ webhook_token }}",
+      "uuid": "{{ webhook_token_uuid }}",
+      "created_at": "{{ ansible_date_time.iso8601 }}",
+      "job_name": "{{ jenkins_job_name | default('k8s-automated-dr') }}",
       "webhook_url": "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters",
-      "jenkins_job_url": "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/",
-      "trigger_domain": "https://trigger.{{ jenkins_live_domain }}/trigger"
+      "trigger_domain": "https://trigger.{{ jenkins_live_domain }}/trigger",
+      "api_approach": "true"
     }
     EOJSON
     EOF
+  register: jenkins_result
 
-- name: Test webhook token functionality
+- name: Display token generation results
+  debug:
+    msg:
+      - "🔐 TOKEN GENERATION & STORAGE COMPLETE"
+      - "======================================"
+      - "Token: {{ webhook_token }}"
+      - "UUID: {{ webhook_token_uuid }}"
+
+- name: Get Jenkins crumb for CSRF protection
   uri:
-    url: "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters"
+    url: "https://{{ jenkins_live_domain }}/crumbIssuer/api/json"
+    method: GET
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+    return_content: yes
+    validate_certs: no
+  register: jenkins_crumb
+
+# Test webhook with correct URL and authentication
+- name: Test webhook functionality with Generic Webhook Trigger endpoint
+  uri:
+    url: "https://{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
     method: POST
     headers:
       Content-Type: "application/json"
+      X-Webhook-Token: "{{ webhook_token }}"
     body_format: json
     body:
       deploy_standby_only: false
       destroy_after_apply: false
       skip_tests: true
-      triggered_by: "ansible-test"
+      triggered_by: "ansible-api-test"
       alert_type: "test"
+      alert_value: "100"
       timestamp: "{{ ansible_date_time.iso8601 }}"
-    status_code: [200, 201]
+    status_code: [200, 201, 302]
+    validate_certs: no
+    timeout: 30
   register: webhook_test
-  ignore_errors: true
 
 - name: Display webhook test results
   debug:
@@ -421,3 +361,113 @@
   set_fact:
     webhook_url: "{{ (webhook_config.results | selectattr('item', 'equalto', 'jenkins_webhook') | first).json.data.data.webhook_url }}"
     trigger_domain: "{{ (webhook_config.results | selectattr('item', 'equalto', 'jenkins_webhook') | first).json.data.data.trigger_domain }}"
+
+# Create Kubernetes Secret for CSI Driver integration
+- name: Create Kubernetes secret with webhook configuration
+  kubernetes.core.k8s:
+    name: jenkins-webhook-config
+    api_version: v1
+    kind: Secret
+    namespace: "{{ k8s_namespace | default('default') }}"
+    definition:
+      metadata:
+        name: jenkins-webhook-config
+        namespace: "{{ k8s_namespace | default('default') }}"
+        labels:
+          app: automated-dr
+          component: webhook
+          created-by: ansible
+      type: Opaque
+      stringData:
+        webhook-url: "https://{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
+        webhook-token: "{{ webhook_token }}"
+        jenkins-domain: "{{ jenkins_live_domain }}"
+        jenkins-job-url: "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/"
+        trigger-domain: "https://{{ trigger_live_domain | default(jenkins_live_domain) }}/trigger"
+        created-at: "{{ ansible_date_time.iso8601 }}"
+  delegate_to: localhost
+  when: create_k8s_secret | default(true)
+
+# Create SecretProviderClass for Vault CSI Driver
+- name: Create SecretProviderClass for Vault CSI Driver
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: secrets-store.csi.x-k8s.io/v1
+      kind: SecretProviderClass
+      metadata:
+        name: vault-jenkins-webhook-secrets
+        namespace: "{{ k8s_namespace | default('default') }}"
+        labels:
+          app: automated-dr
+          component: webhook-secrets
+      spec:
+        provider: vault
+        parameters:
+          vaultAddress: "{{ remote_vault_address }}"
+          roleName: "webhook-reader"
+          objects: |
+            - objectName: "webhook-url"
+              secretPath: "secret/data/jenkins_webhook"
+              secretKey: "webhook_url"
+            - objectName: "webhook-token" 
+              secretPath: "secret/data/jenkins_webhook"
+              secretKey: "webhook_token"
+            - objectName: "jenkins-domain"
+              secretPath: "secret/data/jenkins_webhook" 
+              secretKey: "jenkins_domain"
+            - objectName: "jenkins-job-url"
+              secretPath: "secret/data/jenkins_webhook"
+              secretKey: "jenkins_job_url"
+        secretObjects:
+        - data:
+          - key: webhook-url
+            objectName: webhook-url
+          - key: webhook-token
+            objectName: webhook-token  
+          - key: jenkins-domain
+            objectName: jenkins-domain
+          - key: jenkins-job-url
+            objectName: jenkins-job-url
+          secretName: jenkins-webhook-from-vault
+          type: Opaque
+  delegate_to: localhost
+  when: use_vault_csi | default(true)
+
+# Verify webhook token is in job configuration
+- name: Verify webhook token in job configuration
+  uri:
+    url: "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/config.xml"
+    method: GET
+    user: "{{ jenkins_username }}"
+    password: "{{ jenkins_api_token }}"
+    force_basic_auth: yes
+    return_content: yes
+    validate_certs: no
+  register: job_config_check
+
+- name: Confirm webhook token is properly configured
+  assert:
+    that:
+      - webhook_token in job_config_check.content
+      - "'generic-webhook-trigger' in job_config_check.content"
+    fail_msg: "Webhook token {{ webhook_token }} not found in job configuration"
+    success_msg: "✅ Webhook token {{ webhook_token }} confirmed in job configuration"
+
+# Display comprehensive results
+- name: Display API-based webhook automation results
+  debug:
+    msg:
+      - "🎯 API-BASED WEBHOOK AUTOMATION COMPLETE"
+      - "=========================================="
+      - "✅ Job Creation: {{ 'SUCCESS' if job_creation_result.status in [200, 201] else 'FAILED' }}"
+      - "✅ Job Verification: {{ 'SUCCESS' if job_verification.status == 200 else 'FAILED' }}"
+      - "✅ Vault Storage: {{ 'SUCCESS' if vault_storage_result.rc == 0 else 'FAILED' }}"
+      - "✅ Webhook Test: {{ 'SUCCESS' if webhook_test.status in [200, 201, 302] else 'FAILED (' + webhook_test.status|string + ')' }}"
+      - "✅ Config Verification: {{ 'SUCCESS' if webhook_token in job_config_check.content else 'FAILED' }}"
+      - ""
+      - "🔗 ENDPOINTS:"
+      - "   Webhook URL: https://{{ jenkins_live_domain }}/generic-webhook-trigger/invoke?token={{ webhook_token }}"
+      - "   Job Console: https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/"
+      - "   Job Config: https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/configure"
+      - ""
+      - "🔐 KUBERNETES"
