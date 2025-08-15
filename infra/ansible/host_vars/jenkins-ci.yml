@@ -12,6 +12,7 @@ jenkins_pkg_name: "jenkins"
 letsencrypt_email: "emmanuelaladejana05@gmail.com"
 jenkins_token_name: "k8s-automated-dr"
 git_repo_url: "https://github.com/Janortop5/k8s-automated-dr.git"
+test_job_name: "webhook-e2e-test"
 
 # Iterate over every suffix until Cerbot succeeds
 public_suffixes:

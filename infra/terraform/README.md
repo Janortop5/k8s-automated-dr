@@ -85,8 +85,6 @@ EOF
 
 #### Everything together
 ```bash
-docker ps -a --format '{{.Names}}' | grep -w tf_vault && docker start tf_vault || docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=0102911' --name 'tf_vault' -p 8200:8200 hashicorp/vault:latest
-
 export TF_VAR_vault_address='http://127.0.0.1:8200'
 export TF_VAR_ansible_vault_password='your-ansible-vault-token'
 export TF_VAR_vault_token='your-tf-vault-token'
@@ -98,6 +96,8 @@ export git_username='your-git-username'
 export git_password='your-git-password'
 export docker_username='your-docker-username'
 export docker_password='your-docker-password'
+
+docker ps -a --format '{{.Names}}' | grep -w tf_vault && docker start tf_vault || docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=0102911' --name 'tf_vault' -p 8200:8200 hashicorp/vault:latest
 
 docker exec -it tf_vault sh -c "export VAULT_ADDR='http://127.0.0.1:8200' && vault login ${vault_token} && vault kv put secret/test username='admin' password='1234'"
 
@@ -143,7 +143,7 @@ EOF
 #### Run Terraform
 - First, confirm aws profile and region. i.e.
 ```bash
-aws configure # after, click **Enter**, **Enter**, **Enter** **Enter** -> if fields contain non-preferred values add new value before hitting enter.
+aws configure # after, click **Enter**, **Enter**, **Enter** **Enter** -> if fields contain non-preferred or no values add new value before hitting enter.
 ```
 - Format, Validate, Initialize and run the Terraform Configuration.
 ```bash
