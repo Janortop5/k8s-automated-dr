@@ -19,7 +19,7 @@
     nodejs_trigger_url: https://trigger.{{ jenkins_live_domain }}/trigger
     jenkins_webhook_url: "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters"
 
-- name: Read main kubeconfig file
+- name: Read main kubeconfig file_v2
   slurp:
     src: "{{ kubeconfig_main_path }}"
   register: main_kubeconfig_file
@@ -37,6 +37,7 @@
     src: /opt/metrics-collector/k8s-manifests/metrics_collector_deployment.yml
   register: manifest_raw
 
+# Step 1: Apply the deployment (your existing task)
 - name: Apply updated metrics collector deployment
   kubernetes.core.k8s:
     state: present
@@ -44,25 +45,225 @@
     kubeconfig: "{{ kubeconfig_data }}"
   register: collector_deployment
 
-- name: Verify metrics collector deployment
+# Step 2: Wait for deployment to be observed by controller
+- name: Wait for deployment to be processed
   kubernetes.core.k8s_info:
     api_version: apps/v1
     kind: Deployment
     name: prometheus-metrics-collector
     namespace: monitoring
     kubeconfig: "{{ kubeconfig_data }}"
-  register: collector_status
+  register: deployment_check
   until: >
-    collector_status.resources[0].status.readyReplicas is defined and
-    collector_status.resources[0].status.replicas is defined and
-    collector_status.resources[0].status.readyReplicas == collector_status.resources[0].status.replicas
+    deployment_check.resources | length > 0 and
+    deployment_check.resources[0].status is defined and
+    deployment_check.resources[0].status.observedGeneration is defined
   retries: 5
-  delay: 5
+  delay: 3
 
-- name: Display updated collector configuration
+# Step 3: Check for immediate deployment failures
+- name: Check deployment status conditions
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: prometheus-metrics-collector
+    namespace: monitoring
+    kubeconfig: "{{ kubeconfig_data }}"
+  register: deployment_status
+
+- name: Analyze deployment conditions
+  set_fact:
+    deployment_failed: >-
+      {{
+        deployment_status.resources[0].status.conditions
+        | selectattr('type', 'equalto', 'Progressing')
+        | selectattr('status', 'equalto', 'False')
+        | selectattr('reason', 'equalto', 'ProgressDeadlineExceeded')
+        | list | length > 0
+      }}
+    deployment_available: >-
+      {{
+        deployment_status.resources[0].status.conditions
+        | selectattr('type', 'equalto', 'Available')
+        | selectattr('status', 'equalto', 'True')
+        | list | length > 0
+      }}
+
+# Step 4: Get ReplicaSet and Pod details for troubleshooting
+- name: Get ReplicaSet information
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: ReplicaSet
+    namespace: monitoring
+    label_selectors:
+      - app=metrics-collector
+    kubeconfig: "{{ kubeconfig_data }}"
+  register: replicaset_info
+
+- name: Get Pod information
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: monitoring
+    label_selectors:
+      - app=metrics-collector
+    kubeconfig: "{{ kubeconfig_data }}"
+  register: pod_info
+
+# Step 5: Display diagnostic information
+- name: Display deployment summary
   debug:
     msg:
-      - "✅ Metrics Collector Updated Successfully"
-      - "NodeJS Trigger URL: {{ trigger_live_domain }}"
-      - "Jenkins Webhook URL: {{ webhook_url }}"
-      - "Deployment Status: {{ collector_status.resources[0].status.conditions[-1].type }}"
+      - "=== DEPLOYMENT STATUS ANALYSIS ==="
+      - "Deployment Failed: {{ deployment_failed }}"
+      - "Deployment Available: {{ deployment_available }}"
+      - "Desired Replicas: {{ deployment_status.resources[0].spec.replicas }}"
+      - "Ready Replicas: {{ deployment_status.resources[0].status.readyReplicas | default('0') }}"
+      - "Available Replicas: {{ deployment_status.resources[0].status.availableReplicas | default('0') }}"
+      - "Unavailable Replicas: {{ deployment_status.resources[0].status.unavailableReplicas | default('0') }}"
+      - ""
+      - "=== DEPLOYMENT CONDITIONS ==="
+
+- name: Display deployment conditions
+  debug:
+    msg:
+      - "{{ item.type }}: {{ item.status }} ({{ item.reason }})"
+      - "Message: {{ item.message }}"
+  loop: "{{ deployment_status.resources[0].status.conditions | default([]) }}"
+  loop_control:
+    label: "{{ item.type }}"
+
+- name: Display Pod status
+  debug:
+    msg:
+      - "Pod: {{ item.metadata.name }}"
+      - "Phase: {{ item.status.phase }}"
+  loop: "{{ pod_info.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: pod_info.resources | length > 0
+
+- name: Display container status for each pod
+  debug:
+    msg:
+      - "  Container: {{ container.name }}"
+      - "  Ready: {{ container.ready }}"
+      - "  Started: {{ container.started | default('N/A') }}"
+      - "  Restart Count: {{ container.restartCount }}"
+      - "{% if container.state.waiting is defined %}Status: Waiting - {{ container.state.waiting.reason }}{% endif %}"
+      - "{% if container.state.running is defined %}Status: Running since {{ container.state.running.startedAt }}{% endif %}"
+      - "{% if container.state.terminated is defined %}Status: Terminated - {{ container.state.terminated.reason }}, Exit Code: {{ container.state.terminated.exitCode }}{% endif %}"
+  loop: "{{ pod_info.resources | map(attribute='status.containerStatuses') | flatten }}"
+  loop_control:
+    label: "{{ container.name }}"
+  vars:
+    container: "{{ item }}"
+  when: pod_info.resources | length > 0
+
+# Step 6: Fail immediately if deployment has definitively failed
+- name: Fail if deployment has exceeded progress deadline
+  fail:
+    msg: |
+      Deployment has failed! Progress deadline exceeded.
+      Check the pod logs and events for more details.
+      Run: kubectl describe deployment prometheus-metrics-collector -n monitoring
+      Run: kubectl get events -n monitoring --sort-by='.lastTimestamp'
+  when: deployment_failed | bool
+  ignore_errors: true
+
+# Step 7: Check for common failure reasons
+- name: Analyze pod failure reasons
+  set_fact:
+    common_failures:
+      image_pull_error: >-
+        {{
+          pod_info.resources
+          | selectattr('status.containerStatuses', 'defined')
+          | map(attribute='status.containerStatuses')
+          | flatten
+          | selectattr('state.waiting', 'defined')
+          | selectattr('state.waiting.reason', 'match', '.*ImagePull.*|.*ErrImagePull.*|.*InvalidImageName.*')
+          | list | length > 0
+        }}
+      crash_loop_backoff: >-
+        {{
+          pod_info.resources
+          | selectattr('status.containerStatuses', 'defined')
+          | map(attribute='status.containerStatuses')
+          | flatten
+          | selectattr('state.waiting', 'defined')
+          | selectattr('state.waiting.reason', 'equalto', 'CrashLoopBackOff')
+          | list | length > 0
+        }}
+      config_error: >-
+        {{
+          pod_info.resources
+          | selectattr('status.containerStatuses', 'defined')
+          | map(attribute='status.containerStatuses')
+          | flatten
+          | selectattr('state.waiting', 'defined')
+          | selectattr('state.waiting.reason', 'match', '.*CreateContainerConfigError.*|.*CreateContainerError.*')
+          | list | length > 0
+        }}
+  when: pod_info.resources | length > 0
+  ignore_errors: true
+
+- name: IMAGE PULL ERROR DETECTED
+  debug:
+    msg:
+      - "❌ IMAGE PULL ERROR DETECTED"
+      - "- Check if image 'freshinit/metrics-collector:latest' exists and is accessible"
+      - "- Verify image registry credentials if using private registry"
+      - "- Try: kubectl describe pod <pod-name> -n monitoring"
+  when: common_failures.image_pull_error
+  ignore_errors: true
+
+- name: CRASH LOOP BACKOFF DETECTED
+  debug:
+    msg:
+      - "❌ CRASH LOOP BACKOFF DETECTED"
+      - "- Container is starting but immediately crashing"
+      - "- Check application logs: kubectl logs <pod-name> -n monitoring"
+      - "- Verify environment variables and configuration"
+  when: common_failures.crash_loop_backoff
+  ignore_errors: true
+
+- name: CONFIGURATION ERROR DETECTED
+  debug:
+    msg:
+      - "❌ CONFIGURATION ERROR DETECTED"
+      - "- Check ConfigMaps, Secrets, and environment variables"
+      - "- Verify service account and RBAC permissions"
+  when: common_failures.config_error
+  ignore_errors: true
+
+
+# Step 8: Wait for successful deployment only if no immediate failures
+- name: Wait for deployment to become ready (only if no failures detected)
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: prometheus-metrics-collector
+    namespace: monitoring
+    kubeconfig: "{{ kubeconfig_data }}"
+  register: final_status
+  until: >
+    final_status.resources | length > 0 and
+    final_status.resources[0].status is defined and
+    final_status.resources[0].status.readyReplicas is defined and
+    final_status.resources[0].status.readyReplicas == final_status.resources[0].spec.replicas and
+    final_status.resources[0].status.availableReplicas == final_status.resources[0].spec.replicas
+  retries: 3
+  delay: 15
+  when: not (deployment_failed | bool)
+
+# Step 9: Final success confirmation
+- name: Confirm deployment success
+  debug:
+    msg:
+      - "✅ DEPLOYMENT SUCCESSFUL"
+      - "Ready Replicas: {{ final_status.resources[0].status.readyReplicas }}/{{ final_status.resources[0].spec.replicas }}"
+      - "All containers are running and ready"
+  when: 
+    - not (deployment_failed | bool)
+    - final_status.resources[0].status.readyReplicas == final_status.resources[0].spec.replicas
