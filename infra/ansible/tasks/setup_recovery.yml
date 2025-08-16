@@ -193,6 +193,7 @@
     path: "{{ app_dir }}"
     state: present
   become_user: "{{ app_user }}"
+  become_method: sudo
 
 - name: Create .env file from template
   template:
@@ -200,7 +201,11 @@
     dest: "{{ app_dir }}/.env"
     owner: "{{ app_user }}"
     group: "{{ app_user }}"
-    mode: "0600"  # Secure permissions for sensitive data
+    mode: "0600"
+  become: true
+  retries: 3
+  delay: 5
+  timeout: 30
   notify:
     - restart {{ app_name }}
 
