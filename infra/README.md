@@ -1,4 +1,5 @@
-# Setup Jenkins for k8s-automated-dr
+# Jenkins manual setup
+### Setup Jenkins for k8s-automated-dr
 AFTER RUNNING THE INFRA's TERRAFORM CODE AND ANSIBLE TASKS.
 
 Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub repo so every push kicks off a build.
@@ -175,19 +176,6 @@ exactly what the Kubernetes API expects.
 
 After **Save** → Jenkins will scan the repo immediately, build any branch with a `Jenkinsfile`, and keep polling via the webhook.
 
-### Lite alternative: *Freestyle* or *Single Pipeline* job
-
-If “one branch, one job” is enough:
-
-1. **New Item → Pipeline**
-2. Under **Pipeline script**, either:
-
-   * **SCM → Git** and point to your repo (supply creds) — or —
-   * Use **Pipeline script from SCM** to run the `Jenkinsfile` in the repo.
-3. In **Build Triggers** tick **“GitHub hook trigger for GITScm polling”**.
-
-
-
 ## 5  Add (or verify) the webhook
 
 *If you gave the token the `admin:repo_hook` scope, Jenkins auto-creates it the first time the job saves. If not:*
@@ -200,15 +188,7 @@ If “one branch, one job” is enough:
 
 GitHub will ping the endpoint; you should see “*Payload delivered*” and a 200‐OK response.
 
-
-## 6  Lock it down 
-
-| Quick check                     | Why                                                                                                          |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Controller executors = 0**    | Even for a hobby box, it helps avoid “works on my machine” surprises when you later add agents.              |
-| **Backup your `JENKINS_HOME`**  | At least tarball it once in a while.                                                                         |
-
-## Reclaim Space on Jenkins Server
+#### Reclaim Space on Jenkins Server
 
 ```bash
 sudo su - 
@@ -222,7 +202,4 @@ sudo su - jenkins
 mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
 ```
 
-### That’s it!
-
-Push a commit → GitHub fires a webhook → Jenkins job appears or rebuilds in the UI. If anything doesn’t trigger:
 

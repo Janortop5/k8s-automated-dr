@@ -264,6 +264,7 @@
       - "✅ DEPLOYMENT SUCCESSFUL"
       - "Ready Replicas: {{ final_status.resources[0].status.readyReplicas }}/{{ final_status.resources[0].spec.replicas }}"
       - "All containers are running and ready"
+  ignore_errors: true
   when: 
     - not (deployment_failed | bool)
     - final_status.resources[0].status.readyReplicas == final_status.resources[0].spec.replicas

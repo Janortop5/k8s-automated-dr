@@ -46,6 +46,7 @@
   - name: Setup Vault Container
     import_tasks: tasks/setup_vault.yml
     tags: vault
+    become: true
     when: "'jenkins-server' in group_names"
     
   - name: Setup Jenkins dependencies

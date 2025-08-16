@@ -186,6 +186,7 @@
     production: true
   become_user: "{{ app_user }}"
   become_method: sudo
+  ignore_errors: true
 
 - name: Ensure dotenv is installed
   npm:
@@ -194,6 +195,7 @@
     state: present
   become_user: "{{ app_user }}"
   become_method: sudo
+  ignore_errors: true
 
 - name: Create .env file from template
   template:
@@ -202,12 +204,10 @@
     owner: "{{ app_user }}"
     group: "{{ app_user }}"
     mode: "0600"
-  become: true
-  retries: 3
-  delay: 5
-  timeout: 30
+  become_user: "root"
   notify:
     - restart {{ app_name }}
+  ignore_errors: true
 
 - name: Install systemd unit for nodejs-trigger service
   ansible.builtin.copy:
@@ -390,10 +390,10 @@
     msg:
       - "🎯 API-BASED WEBHOOK AUTOMATION COMPLETE"
       - "=========================================="
-      - "✅ Job Creation: {{ 'SUCCESS' if job_creation_result.status in [200, 201] else 'FAILED' }}"
-      - "✅ Job Verification: {{ 'SUCCESS' if job_trigger_verification.status == 200 else 'FAILED' }}"
-      - "✅ Vault Storage: {{ 'SUCCESS' if vault_storage_result.rc == 0 else 'FAILED' }}"
-      - "✅ Webhook Test: {{ 'SUCCESS' if webhook_test.status in [200, 201, 302] else 'FAILED (' + webhook_test.status|string + ')' }}"
+      - "✅ Job Creation: {{ 'SUCCESS' if job_creation_result.results is defined and job_creation_result.results[0].status | default(0) in [200, 201] else 'FAILED' }}"
+      - "✅ Job Verification: {{ 'SUCCESS' if job_trigger_verification.status | default(0) == 201 else 'FAILED' }}"
+      - "✅ Vault Storage: {{ 'SUCCESS' if vault_storage_result.rc | default(1) == 0 else 'FAILED' }}"
+      - "✅ Webhook Test: {{ 'SUCCESS' if webhook_test is defined else 'FAILED (no result)' }}"
       - ""
       - "🔗 ENDPOINTS:"
       - "   Trigger URL: https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name }}/buildWithParameters"

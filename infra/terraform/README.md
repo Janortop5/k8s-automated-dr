@@ -5,6 +5,8 @@ This Terraform Configuration creates a Functional Kubeadm Kubernetes Environment
 - Installation of **Docker** locally
 - Installation of **Terraform** locally
 - Instalation of **Ansibe** locally
+- Docker PAT
+- Github PAT (recommended) or password
 
 ## How to use our terraform IaC
 #### First create Terraform vault.

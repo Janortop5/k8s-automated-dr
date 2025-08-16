@@ -138,4 +138,3 @@ Contributions and suggestions are welcome! Please open an issue or submit a pull
 
 ## License
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.
-
