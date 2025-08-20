@@ -57,12 +57,22 @@
   - name: Install required Jenkins plugins
     import_tasks: tasks/install_required_jenkins_plugins.yml
     tags: jenkins
+    become: True
     when: "'jenkins-server' in group_names"
-
+  
   - name: Jenkins trigger configuration
     import_tasks: tasks/setup_recovery.yml
     tags: jenkins
     when: "'jenkins-server' in group_names"
+
+
+  - name: Share jenkins_live_domain with all hosts
+    set_fact:
+      jenkins_live_domain: "{{ hostvars[groups['jenkins-server'][0]].jenkins_live_domain }}"
+    delegate_to: "{{ item }}"
+    delegate_facts: true
+    with_items: "{{ groups['all'] }}"
+    run_once: true
 
   - name: Update Metrics Collector
     import_tasks: tasks/update_metrics_collector.yml
