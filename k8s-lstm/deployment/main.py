@@ -175,8 +175,7 @@ async def model_info():
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error getting model info: {
-                str(e)}")
+            detail=f"Error getting model info: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -164,9 +164,7 @@ class AlertManager:
                     logger.info("Alert sent to Slack successfully")
                     success = True
                 else:
-                    logger.error(
-                        f"Failed to send Slack alert: {
-                            response.status_code}")
+                    logger.error(f"Failed to send Slack alert: {response.status_code}")
             except Exception as e:
                 logger.error(f"Error sending Slack alert: {e}")
 
@@ -191,9 +189,7 @@ class AlertManager:
                     logger.info("Alert sent to Teams successfully")
                     success = True
                 else:
-                    logger.error(
-                        f"Failed to send Teams alert: {
-                            response.status_code}")
+                    logger.error(f"Failed to send Teams alert: {response.status_code}")
             except Exception as e:
                 logger.error(f"Error sending Teams alert: {e}")
 

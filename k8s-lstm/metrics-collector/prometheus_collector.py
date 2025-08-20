@@ -359,8 +359,7 @@ class PrometheusMetricsCollector:
 
                 return result
             else:
-                logger.error(f"Prediction failed: {
-                             response.status_code} - {response.text}")
+                logger.error(f"Prediction failed: {response.status_code} - {response.text}")
                 return None
 
         except Exception as e:
