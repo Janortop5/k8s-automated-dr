@@ -72,13 +72,20 @@
   notify: reload nginx
 
 - name: Record winning domain (if any)
-  ansible.builtin.set_fact:
+  set_fact:
     cert_obtained: true
     jenkins_live_domain: "{{ item.item | ternary('jenkins.' ~ jenkins_public_ip ~ '.' ~ item.item, '') }}"
   when: item.rc is defined and item.rc == 0
   loop: "{{ certbot_attempts.results }}"
   loop_control:
     label: "{{ item.item }}"
+
+- name: Set jenkins_live_domain globally
+  set_fact:
+    jenkins_live_domain: "{{ jenkins_live_domain }}"
+  delegate_to: localhost
+  delegate_facts: true  # This ensures the fact is available on all hosts
+  run_once: true
 
 - name: Abort when no certificate could be obtained
   fail:
@@ -443,6 +450,12 @@
   set_fact:
     k8s_server_url: "{{ kubeconfig_data.clusters[0].cluster.server }}"
 
+- name: prepare kubeconfig script
+  set_fact:
+    kubeconfig_script: "{{ lookup('file', 'files/jenkins/add-kubeconfig.groovy')
+      | replace('${MAIN_KUBECONFIG_FILENAME}', 'kubeconfig-' ~ ansible_default_ipv4.address ~ '.yaml')
+      | replace('${MAIN_KUBECONFIG_CONTENT}', (main_kubeconfig_file.content | b64decode))
+      | replace('${AGENT_KUBECONFIG_CONTENT}', (agent_kubeconfig_file.content | b64decode)) }}"
 
 - name: Add Kubeconfig credentials to Jenkins
   uri:
@@ -455,14 +468,11 @@
       Jenkins-Crumb: "{{ jenkins_crumb.json.crumb }}"
     body_format: form-urlencoded
     body:
-      script: |
-        {{ lookup('file', 'files/jenkins/add-kubeconfig.groovy') |
-           replace('${MAIN_KUBECONFIG_FILENAME}', 'kubeconfig-' + ansible_default_ipv4.address + '.yaml') |
-           replace('${MAIN_KUBECONFIG_CONTENT}', main_kubeconfig_file.content | b64decode) |
-           replace('${AGENT_KUBECONFIG_CONTENT}', agent_kubeconfig_file.content | b64decode) }}
+      script: "{{ kubeconfig_script }}"
     status_code: [200]
-  no_log: true
+  no_log: False
   when: main_kubeconfig_file is defined and agent_kubeconfig_file is defined
+
 
 # ---------------------------------------------------------------------------
 # 9.  Configure Kubernetes Cloud
@@ -495,3 +505,8 @@
     status_code: [200]
   register: k8s_cloud_config
   when: k8s_server_url is defined
+
+- name: verify jenkins live domain
+  ansible.builtin.debug:
+    msg: "Jenkins is configured with live domain: {{ jenkins_live_domain }}"
+  when: jenkins_live_domain is defined and jenkins_live_domain != ""

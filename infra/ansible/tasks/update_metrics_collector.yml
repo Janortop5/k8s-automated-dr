@@ -11,7 +11,7 @@
     mode: '0755'
 
 - name: Generate updated metrics collector manifest
-  template:
+  template: 
     src: "{{ playbook_dir }}/templates/metrics_collector_deployment.yaml.j2"
     dest: "{{  metrics_dir }}/metrics_collector_deployment.yml"
     backup: yes
