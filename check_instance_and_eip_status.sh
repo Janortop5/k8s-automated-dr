@@ -49,11 +49,9 @@ fi
 # -------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------
-# Check region access: skip if no AZs are visible
-
 # Common wrapper that will run an AWS CLI command or skip on error
 aws_or_skip() {
-  "$@" 2>/dev/null || return 1
+  "$@" || return 1
 }
 
 # -------------------------------------------------------------------
@@ -64,7 +62,7 @@ check_instance_status() {
   echo "=== [$profile] region: $region ==="
   
   # Get instance details with EIP information
-  aws_or_skip aws ec2 describe-instances \
+  aws ec2 describe-instances \
     --profile "$profile" \
     --region  "$region" \
     --query 'Reservations[*].Instances[*].[InstanceId,State.Name,InstanceType,Tags[?Key==`Name`].Value|[0],PublicIpAddress,PrivateIpAddress]' \
