@@ -1,4 +1,4 @@
-# k8s-automated-dr
+# k8s-automated-dr MANUAL
 ## 1. High-Level System Concept
 An **automated** end‑to‑end **platform** that:
 1. Provisions **AWS infrastructure** (network, compute, access, DNS) **via** Terraform (primary + standby environments).
