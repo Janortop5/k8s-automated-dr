@@ -605,3 +605,70 @@ mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
    ```
 #### TODO: UPDATE SECURITY GROUP TO ALLOW 10080
 ## Velero
+
+### Overview
+Velero is a critical component of the disaster recovery system that:
+
+1. **Backs up and restores** Kubernetes cluster resources and persistent volumes
+2. **Enables disaster recovery** by providing point-in-time snapshots of the cluster state
+3. **Facilitates cluster migration** between environments (primary to standby)
+4. **Automates backup schedules** (configured for every 6 hours)
+
+### Key Features
+1. **Kubernetes-Native Backup**:
+   - Captures all cluster resources (deployments, configmaps, secrets, etc.)
+   - Backs up persistent volumes using cloud provider snapshots
+   - Stores backups in S3-compatible object storage
+
+2. **Disaster Recovery Capabilities**:
+   - Restores entire cluster or selected namespaces
+   - Preserves resource relationships during restore
+   - Supports cross-cluster migration of workloads
+
+3. **Integration with AWS**:
+   - Uses AWS S3 buckets for backup storage
+   - Leverages AWS EBS snapshots for persistent volume data
+   - Securely accesses AWS resources using IAM roles
+
+4. **Operational Features**:
+   - CLI tool for manual backup/restore operations
+   - Scheduled backups for consistent recovery points
+   - Backup retention policies to manage storage usage
+
+Velero serves as the foundation of the disaster recovery strategy, enabling rapid restoration of the Kubernetes cluster and its workloads in the standby environment when primary cluster failures occur.
+
+## Node.js Trigger Service
+
+### Overview
+The Node.js trigger service is a critical component of the automated disaster recovery system that:
+
+1. **Acts as a middleware** between monitoring systems and Jenkins pipelines
+2. **Provides a reliable queue-based system** for DR operations using Redis
+3. **Securely manages credentials** via HashiCorp Vault integration
+4. **Runs as a systemd service** on the Jenkins server
+
+### Key Features
+1. **API Endpoints**:
+   - `/health` - Health check endpoint
+   - `/trigger` - Main endpoint to queue DR jobs
+   - `/queue/status` - Shows the current queue status
+   - `/job/:jobId/status` - Shows status of a specific job
+
+2. **Queue Management**:
+   - Uses Redis to maintain job queues
+   - Prevents overloading Jenkins with concurrent requests
+   - Tracks job status throughout execution
+
+3. **Automated DR Triggering**:
+   - Initiates standby cluster deployment when primary cluster issues are detected
+   - Passes configurable parameters to Jenkins pipelines:
+     - `deploy_standby_only` - Deploy only the standby environment
+     - `destroy_after_apply` - Clean up resources after testing
+     - `skip_tests` - Skip test phases for faster deployment
+
+4. **Integration**:
+   - Connects to Jenkins via webhook API
+   - Retrieves credentials securely from Vault
+   - Can be triggered by monitoring alerts or manual requests
+
+This service enables fully automated disaster recovery by providing a reliable mechanism to trigger the standby environment deployment when the primary cluster experiences issues.
