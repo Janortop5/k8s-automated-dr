@@ -399,6 +399,8 @@ export git_username='your-git-username'
 export git_password='your-git-password'
 export docker_username='your-docker-username'
 export docker_password='your-docker-password'
+export aws_access_key='your-access-key'
+export aws_secret_access_key='your-secret-access-key'
 
 docker ps -a --format '{{.Names}}' | grep -w tf_vault && docker start tf_vault || docker run -dit --cap-add=IPC_LOCK -e 'VAULT_DEV_ROOT_TOKEN_ID=0102911' --name 'tf_vault' -p 8200:8200 hashicorp/vault:latest
 
@@ -600,8 +602,8 @@ mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
    b. **Via SSH tunnel (if you’ve SSH’d into a node):**
    First ssh into the node and run the port-foward command in step 3a, then run locally:
    ```bash
-   ssh -N -L 10080:127.0.0.1:10080 ubuntu@<node-ip> -i k8s-cluster.pem
-   # → browse http://localhost:10080
+   ssh -N -L 10080:127.0.0.1:8080 ubuntu@<node-ip> -i k8s-cluster.pem
+   # → browse http://localhost:8080
    ```
 ## Velero
 
