@@ -606,7 +606,6 @@ mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
 #### TODO: UPDATE SECURITY GROUP TO ALLOW 10080
 ## Velero
 
-### Overview
 Velero is a critical component of the disaster recovery system that:
 
 1. **Backs up and restores** Kubernetes cluster resources and persistent volumes
@@ -639,7 +638,6 @@ Velero serves as the foundation of the disaster recovery strategy, enabling rapi
 
 ## Node.js Trigger Service
 
-### Overview
 The Node.js trigger service is a critical component of the automated disaster recovery system that:
 
 1. **Acts as a middleware** between monitoring systems and Jenkins pipelines
