@@ -603,7 +603,6 @@ mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
    ssh -N -L 10080:127.0.0.1:10080 ubuntu@<node-ip> -i k8s-cluster.pem
    # → browse http://localhost:10080
    ```
-#### TODO: UPDATE SECURITY GROUP TO ALLOW 10080
 ## Velero
 
 Velero is a critical component of the disaster recovery system that:

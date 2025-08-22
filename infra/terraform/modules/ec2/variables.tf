@@ -80,6 +80,7 @@ variable "ec2_instance_k8s_inbound_ports" {
     { from_port = 30000, to_port = 32767, protocol = "tcp", description = "NodePort services" },
     { from_port = 179,   to_port = 179,   protocol = "tcp", description = "Calico BGP" },
     { from_port = 10249, to_port = 10259, protocol = "tcp", description = "Kubelet API" },
+    { from_port = 10080, to_port = 10080, protocol = "tcp", description = "Grafana UI" },
   ]
 }
 
