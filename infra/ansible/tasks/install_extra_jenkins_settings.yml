@@ -446,10 +446,6 @@
   set_fact:
     kubeconfig_data: "{{ lookup('file', kubeconfig_agent_path) | from_yaml }}"
 
-- name: Extract Kubernetes server URL
-  set_fact:
-    k8s_server_url: "{{ kubeconfig_data.clusters[0].cluster.server }}"
-
 - name: prepare kubeconfig script
   set_fact:
     kubeconfig_script: "{{ lookup('file', 'files/jenkins/add-kubeconfig.groovy')

@@ -1,0 +1,18 @@
+- name: Display all configured Jenkins, deployment variables, and set facts
+  debug:
+    msg: "{{ item }}: {{ hostvars[inventory_hostname][item] }}"
+  loop:
+    - trigger_live_domain
+    - webhook_token_uuid
+    - webhook_token
+    - jenkins_admin_password
+    - jenkins_ca_b64
+    - jenkins_token
+    - jenkins_tunnel_url
+    - k8s_server_url
+    - jenkins_username
+    - jenkins_api_token
+    - jenkins_live_domain
+    - join_command
+    - jenkins_password
+
