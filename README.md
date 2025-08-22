@@ -669,4 +669,21 @@ The Node.js trigger service is a critical component of the automated disaster re
    - Retrieves credentials securely from Vault
    - Can be triggered by monitoring alerts or manual requests
 
+### Manual Trigger Example
+To manually trigger the disaster recovery process, you can use the following curl command:
+
+```bash
+curl -X POST "<jenkins_live_domain>/trigger" \
+  -H "Content-Type: application/json" \
+  -H "Jenkins-Crumb: <crumb_token>" \
+  -u "<jenkins_username>:<jenkins_webtoken>" \
+  -d '{
+    "parameters": {
+      "deploy_standby_only": "true",
+      "destroy_after_apply": "true",
+      "skip_tests": "true"
+    }
+  }'
+```
+
 This service enables fully automated disaster recovery by providing a reliable mechanism to trigger the standby environment deployment when the primary cluster experiences issues.
