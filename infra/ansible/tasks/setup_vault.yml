@@ -8,10 +8,11 @@
   register: vault_start
   ignore_errors: true
   failed_when: vault_start.rc != 0 and "already in use" not in vault_start.stderr
+  become_user: "root"
 
 - name: Wait for Vault to initialize
   pause:
-    seconds: 10
+    seconds: 20
 
 - name: Set environment variables
   shell: |
@@ -27,6 +28,7 @@
     vault kv put secret/test username='test_user' password='1234'
     "
   register: test_result
+  become_user: "root"
 
 - name: Store AWS credentials
   shell: |
@@ -36,6 +38,7 @@
     vault kv put secret/aws access_key='{{ aws_access_key_id }}' secret_key='{{ aws_secret_access_key }}'
     "
   register: aws_result
+  become_user: "root"
 
 - name: Store Velero configuration
   shell: |
@@ -45,6 +48,7 @@
     vault kv put secret/velero bucket_name='{{ velero_bucket_name }}' region='{{ velero_region }}'
     "
   register: velero_result
+  become_user: "root"
 
 - name: Store jenkins credentials
   shell: |
@@ -59,6 +63,7 @@
     EOJSON
     EOF
   register: jenkins_result
+  become_user: "root"
 
 - name: Store git credentials
   shell: |
@@ -73,6 +78,7 @@
     EOJSON
     EOF
   register: git_result
+  become_user: "root"
 
 - name: Store docker credentials
   shell: |
@@ -87,6 +93,7 @@
     EOJSON
     EOF
   register: docker_result
+  become_user: "root"
 
 - name: Display setup status
   debug:
