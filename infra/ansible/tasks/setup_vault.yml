@@ -12,7 +12,7 @@
 
 - name: Wait for Vault to initialize
   pause:
-    seconds: 20
+    seconds: 60
 
 - name: Set environment variables
   shell: |
@@ -28,6 +28,7 @@
     vault kv put secret/test username='test_user' password='1234'
     "
   register: test_result
+  become: true
   become_user: "root"
 
 - name: Store AWS credentials
