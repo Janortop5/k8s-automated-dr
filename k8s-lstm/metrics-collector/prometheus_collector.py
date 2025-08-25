@@ -9,7 +9,19 @@ import sys
 from collections import deque
 import statistics
 from alert_manager import AlertManager
+from prometheus_client import Gauge, start_http_server
 
+# Define gauges with units in names
+cpu_prediction = Gauge(
+    "pod_cpu_usage_prediction_cores",
+    "Predicted CPU usage (cores) for a pod",
+    ["namespace"]
+)
+mem_prediction = Gauge(
+    "pod_mem_usage_prediction_bytes",
+    "Predicted memory usage (bytes) for a pod",
+    ["namespace"]
+)
 
 class PrometheusMetricsCollector:
     def __init__(self):
@@ -22,7 +34,7 @@ class PrometheusMetricsCollector:
         self.collection_interval = int(
             os.getenv(
                 'COLLECTION_INTERVAL',
-                '30'))  # seconds
+                '10'))  # seconds
         self.sequence_length = int(
             os.getenv(
                 'SEQUENCE_LENGTH',
@@ -34,6 +46,11 @@ class PrometheusMetricsCollector:
         self.auth_user = os.getenv('PROMETHEUS_AUTH_USER')
         # Optional basic auth password
         self.auth_pass = os.getenv('PROMETHEUS_AUTH_PASS')
+        
+        # Start Prometheus HTTP server
+        metrics_port = int(os.getenv('METRICS_PORT', '8000'))
+        start_http_server(metrics_port)
+        logger.info(f"Prometheus metrics server started on port {metrics_port}")
 
         # Buffer to store time series data
         self.metrics_buffer = deque(maxlen=self.sequence_length)
@@ -351,13 +368,13 @@ class PrometheusMetricsCollector:
                 logger.info(f"Prediction successful: {result}")
 
                 # Check predictions against thresholds
-                if result and 'predictions' in result:
-                    alerts = self.alert_manager.check_prediction(
-                        result['predictions'])
+                if result: # and 'predictions' in result:
+                    prediction = {"cpu_usage": result["cpu_usage"], "mem_usage": result["mem_usage"]}
+                    alerts = self.alert_manager.check_prediction(prediction)
                     if alerts:
                         logger.warning(f"Generated alerts: {alerts}")
 
-                return result
+                    return prediction
             else:
                 logger.error(f"Prediction failed: {response.status_code} - {response.text}")
                 return None
@@ -377,7 +394,7 @@ class PrometheusMetricsCollector:
                 if len(self.metrics_buffer) >= self.sequence_length:
                     # Send sequence to model
                     sequence = list(self.metrics_buffer)
-                    self.send_prediction_request(sequence)
+                    return self.send_prediction_request(sequence)
 
     def run_time_series_collection(self):
         """Run collection with time series data"""
@@ -391,27 +408,38 @@ class PrometheusMetricsCollector:
                     normalized_sequence.append(normalized)
 
             if len(normalized_sequence) == self.sequence_length:
-                self.send_prediction_request(normalized_sequence)
+                return self.send_prediction_request(normalized_sequence)
 
     def run_collector(self, use_time_series: bool = False):
         """Main collection loop"""
         logger.info("Starting metrics collection...")
 
         while self.running:
-            # try:
-            if use_time_series:
-                self.run_time_series_collection()
-            else:
-                self.run_single_collection()
+            try:
+                if use_time_series:
+                    prediction = self.run_time_series_collection()
+                else:
+                    prediction = self.run_single_collection()
+                
+                if prediction:
+                    # Get namespace and pod from environment or use defaults
+                    namespace = os.getenv('POD_NAMESPACE', 'monitoring')
+                    
+                    # Update Prometheus metrics
+                    predicted_cpu_usage = prediction["cpu_usage"][1]
+                    predicted_mem_usage = prediction["mem_usage"][1]
+                    cpu_prediction.labels(namespace=namespace).set(predicted_cpu_usage)
+                    mem_prediction.labels(namespace=namespace).set(predicted_mem_usage)
+                    logger.info(f"Updated Prometheus metrics with predictions: CPU={predicted_cpu_usage}, Memory={predicted_mem_usage }")
+                
+                time.sleep(self.collection_interval)
 
-            time.sleep(self.collection_interval)
-
-            # except KeyboardInterrupt:
-            #     logger.info("Received interrupt signal, stopping...")
-            #     self.running = False
-            # except Exception as e:
-            #     logger.error(f"Error in collection loop: {e}")
-            #     time.sleep(self.collection_interval)
+            except KeyboardInterrupt:
+                logger.info("Received interrupt signal, stopping...")
+                self.running = False
+            except Exception as e:
+                logger.error(f"Error in collection loop: {e}")
+                time.sleep(self.collection_interval)
 
     def stop(self):
         """Stop the collector"""

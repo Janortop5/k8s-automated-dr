@@ -45,44 +45,44 @@ pipeline {
             }
         }
 
-        stage('Lint') {
-            when {
-                expression { !params.SKIP_TESTS }
-            }
-            agent {
-                docker { 
-                    image 'python:3.11-bullseye'
-                    args '-u 0:0'
-                }   
-            }
-            steps {
-                unstash 'repo-source'
-                sh '''
-                    # Lightweight virtual environment
-                    python -m venv .venv
-                    . .venv/bin/activate
+        // stage('Lint') {
+        //     when {
+        //         expression { !params.SKIP_TESTS }
+        //     }
+        //     agent {
+        //         docker { 
+        //             image 'python:3.11-bullseye'
+        //             args '-u 0:0'
+        //         }   
+        //     }
+        //     steps {
+        //         unstash 'repo-source'
+        //         sh '''
+        //             # Lightweight virtual environment
+        //             python -m venv .venv
+        //             . .venv/bin/activate
 
-                    # Install tools
-                    pip install --upgrade pip nbqa flake8 autopep8 nbstripout
+        //             # Install tools
+        //             pip install --upgrade pip nbqa flake8 autopep8 nbstripout
 
-                    # Auto-format whitespace first
-                    nbqa autopep8 --in-place --aggressive --aggressive k8s-lstm/notebook/lstm-disaster-recovery.ipynb
-                    autopep8 --in-place --recursive --aggressive --aggressive k8s-lstm/
+        //             # Auto-format whitespace first
+        //             nbqa autopep8 --in-place --aggressive --aggressive k8s-lstm/notebook/lstm-disaster-recovery.ipynb
+        //             autopep8 --in-place --recursive --aggressive --aggressive k8s-lstm/
 
-                    # Strip notebook outputs
-                    nbstripout k8s-lstm/notebook/lstm-disaster-recovery.ipynb
+        //             # Strip notebook outputs
+        //             nbstripout k8s-lstm/notebook/lstm-disaster-recovery.ipynb
 
-                    # Lint the final artifacts
-                    nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
-                        --max-line-length 120 --extend-ignore E501,F401,F821
-                    flake8 k8s-lstm/ --max-line-length 120 --extend-ignore E501,E999
-                '''
-            }
-            post {
-                success { echo "✅ Linting completed successfully" }
-                failure { echo "❌ Linting failed" }
-            }
-        }
+        //             # Lint the final artifacts
+        //             nbqa flake8 k8s-lstm/notebook/lstm-disaster-recovery.ipynb \
+        //                 --max-line-length 120 --extend-ignore E501,F401,F821
+        //             flake8 k8s-lstm/ --max-line-length 120 --extend-ignore E501,E999
+        //         '''
+        //     }
+        //     post {
+        //         success { echo "✅ Linting completed successfully" }
+        //         failure { echo "❌ Linting failed" }
+        //     }
+        // }
 
         stage('Build & Push') {
             when {

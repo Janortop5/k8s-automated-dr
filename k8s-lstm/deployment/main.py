@@ -29,7 +29,9 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    predictions: dict
+    # predictions: dict
+    cpu_usage: List
+    mem_usage: List
     status: str
 
 
@@ -148,7 +150,9 @@ async def predict(request: PredictionRequest):
         logger.info(f"Predictions: {predictions}")
 
         return PredictionResponse(
-            predictions=predictions,
+            cpu_usage=cpu_usage.tolist(),
+            mem_usage=mem_usage.tolist(),
+            # predictions=predictions,
             status="success"
         )
 
@@ -173,10 +177,7 @@ async def model_info():
             "layers": len(model.layers)
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error getting model info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting model info: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-1
