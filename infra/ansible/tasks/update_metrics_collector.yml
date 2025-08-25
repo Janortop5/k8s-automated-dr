@@ -16,7 +16,7 @@
     dest: "{{  metrics_dir }}/metrics_collector_deployment.yml"
     backup: yes
   vars:
-    nodejs_trigger_url: https://trigger.{{ jenkins_live_domain }}/trigger
+    nodejs_trigger_url: https://trigger.{{ jenkins_public_ip }}/trigger #{{ jenkins_live_domain }}/trigger
     jenkins_webhook_url: "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters"
 
 - name: Read main kubeconfig file_v2

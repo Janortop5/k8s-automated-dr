@@ -35,7 +35,7 @@
       "created_at": "{{ ansible_date_time.iso8601 }}",
       "job_name": "{{ jenkins_job_name | default('k8s-automated-dr') }}",
       "webhook_url": "https://{{ jenkins_live_domain }}/job/{{ jenkins_job_name | default('k8s-automated-dr') }}/job/main/buildWithParameters",
-      "trigger_domain": "https://trigger.{{ jenkins_live_domain }}/trigger",
+      "trigger_domain": "https://trigger.{{ jenkins_public_ip }}/trigger",
       "api_approach": "true"
     }
     EOJSON

@@ -81,8 +81,14 @@
     path: "{{ velero_temp_dir.path }}"
     state: absent
 
+- name: Check if backup schedule exists
+  shell: velero get schedules | grep "every-6-hours" || echo "not found"
+  register: schedule_exists
+  ignore_errors: true
+
 - name: Create Velero backup schedule
   shell: velero schedule create every-6-hours --schedule "0 */6 * * *" --ttl 72h
   args:
     executable: /bin/bash
+  when: schedule_exists.stdout == "not found"
   ignore_errors: true
