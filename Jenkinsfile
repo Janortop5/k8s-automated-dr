@@ -318,6 +318,7 @@ def updateJobStatus(String status) {
         // Only update if we have build parameters indicating this was triggered by the Node.js service
         if (env.BUILD_CAUSE?.contains('GenericWebHookCause') || params.containsKey('DEPLOY_STANDBY_ONLY')) {
             sh """
+                pip3 install --quiet redis
                 python3 -c "
 import redis
 import json
