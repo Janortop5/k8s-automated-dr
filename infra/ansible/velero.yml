@@ -14,3 +14,4 @@
   - name: Display all configured variables and set facts for user or operator
     import_tasks: tasks/display_variables.yml
     tags: variables_and_facts
+    when: inventory_hostname == "jenkins-server" 
