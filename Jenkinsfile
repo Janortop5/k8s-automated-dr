@@ -128,7 +128,7 @@ pipeline {
                     sed -i 's|JENKINS_TRIGGER_URL|${JENKINS_TRIGGER_URL}|g' "./k8s-manifests/collector/metric_collector_deployment.yml"
                     
                     # Now the file is modified in the workspace
-                    cat "k8s-manifest/collector/metrics_collector_deployment.yaml" 
+                    cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
                 """
                 }
             }
