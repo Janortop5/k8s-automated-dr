@@ -22,7 +22,7 @@ spec:
         - containerPort: 8000
         env:
         - name: MODEL_PATH
-          value: "/app/lstm_model.h5"
+          value: "/app/models/lstm_model.h5"
         resources:
           requests:
             memory: "1Gi"
