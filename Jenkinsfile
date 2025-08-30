@@ -181,8 +181,9 @@ spec:
             options { skipDefaultCheckout() }
             steps {
                 unstash 'repo-source'
+                
                 container('kubectl') {
-                    sh '''
+                    sh """
                         cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
                         sed -i 's|JENKINS_TRIGGER_URL|${JENKINS_TRIGGER_URL}|g' "./k8s-manifests/collector/metric_collector_deployment.yml"
                     
@@ -210,7 +211,7 @@ spec:
                                 fi
                             done
                         fi
-                    '''
+                    """
                 }
             }
             post {
