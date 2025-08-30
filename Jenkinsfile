@@ -184,30 +184,31 @@ spec:
                 
                 container('kubectl') {
                     sh """
+                        echo "Original File:"
                         cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
-                        sed -i 's|JENKINS_TRIGGER_URL|${JENKINS_TRIGGER_URL}|g' "./k8s-manifests/collector/metric_collector_deployment.yml"
-                    
-                        # Now the file is modified in the workspace
+                        
+                        # Use double quotes for the sed substitution to allow the shell to correctly expand the variable
+                        sed -i "s|JENKINS_TRIGGER_URL|${env.JENKINS_TRIGGER_URL}|g" "./k8s-manifests/collector/metric_collector_deployment.yml"
+                        
+                        echo "Modified File:"
                         cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
 
                         echo "🔧 Applying Kubernetes manifests to PRODUCTION..."
                         kubectl version 
                         
-                        # Check cluster connectivity
                         if ! kubectl get nodes; then
                             echo "❌ Cannot connect to Kubernetes cluster"
                             exit 1
                         fi
                         
-                        # Apply manifests with Chaos Mesh support
                         if kubectl api-resources | grep -q "stresschaos"; then
                             echo "▶️ Applying Chaos Mesh experiments"
                             kubectl apply -R -f k8s-manifests/ --validate=false
                         else
-                            echo "⚠️ Skipping StressChaos objects (CRDs not installed)"
+                            echo "⚠️ Skipping Chaos Mesh objects (CRDs not installed)"
                             find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
-                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "$file"; then
-                                    kubectl apply -f "$file"
+                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "\$file"; then
+                                    kubectl apply -f "\$file"
                                 fi
                             done
                         fi
