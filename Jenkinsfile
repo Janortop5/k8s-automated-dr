@@ -132,6 +132,7 @@ pipeline {
                 """
                 }
             }
+        }
         stage('Deploy Production') {
             when {
                 expression { return !params.DEPLOY_STANDBY_ONLY }
