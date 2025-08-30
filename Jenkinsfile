@@ -22,6 +22,7 @@ pipeline {
         REPOSITORY  = 'freshinit'
         FULL_IMAGE  = "${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
         DOCKER_CREDENTIALS = credentials('dockerhub-pat')
+        JENKINS_TRIGGER_URL = credentials('jenkins-url')
     }
 
     stages {
@@ -118,6 +119,19 @@ pipeline {
             }
         }
 
+        stage('Process YAML') {
+            steps {
+                script {
+                                
+                sh """
+                    # Use sed to replace placeholders in place
+                    sed -i 's|JENKINS_TRIGGER_URL|${JENKINS_TRIGGER_URL}|g' "k8s-manifest/collector/metrics_collector_deployment.yaml"
+                    
+                    # Now the file is modified in the workspace
+                    cat "k8s-manifest/collector/metrics_collector_deployment.yaml" 
+                """
+                }
+            }
         stage('Deploy Production') {
             when {
                 expression { return !params.DEPLOY_STANDBY_ONLY }
