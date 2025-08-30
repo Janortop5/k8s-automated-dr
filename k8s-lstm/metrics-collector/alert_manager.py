@@ -54,7 +54,7 @@ class AlertManager:
         }
         data = {
             "parameters": {
-                "deploy_standby_only": "true",
+                "deploy_standby_only": "false",
                 "destroy_after_apply": "false",
                 "skip_tests": "false"
             }
