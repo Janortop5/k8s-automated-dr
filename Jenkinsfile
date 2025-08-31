@@ -272,6 +272,7 @@ spec:
                                 echo "[INFO] Applying Terraform plan..."
                                 if terraform apply tfplan; then
                                     echo "[SUCCESS] Terraform apply successful"
+                                    sleep 3000
                                     
                                     # Handle destroy after apply option
                                     if [ "${params.DESTROY_AFTER_APPLY}" = "true" ]; then
