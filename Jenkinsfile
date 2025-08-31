@@ -85,54 +85,40 @@ pipeline {
         //     }
         // }
 
-        stage('Build & Push') {
-            when {
-                expression { !params.SKIP_TESTS }
-            }
-            agent {
-                docker { 
-                    image 'docker:24.0.7'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock -u 0:0'
-                }
-            }
-            steps {
-                unstash 'repo-source'
-                withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub-pat',
-                        usernameVariable: 'DOCKER_USR',
-                        passwordVariable: 'DOCKER_PSW')]) {
+        // stage('Build & Push') {
+        //     when {
+        //         expression { !params.SKIP_TESTS }
+        //     }
+        //     agent {
+        //         docker { 
+        //             image 'docker:24.0.7'
+        //             args '-v /var/run/docker.sock:/var/run/docker.sock -u 0:0'
+        //         }
+        //     }
+        //     steps {
+        //         unstash 'repo-source'
+        //         withCredentials([usernamePassword(
+        //                 credentialsId: 'dockerhub-pat',
+        //                 usernameVariable: 'DOCKER_USR',
+        //                 passwordVariable: 'DOCKER_PSW')]) {
 
-                    sh '''
-                        cd k8s-lstm
-                        echo "$DOCKER_PSW" | docker login -u "$DOCKER_USR" --password-stdin
-                        docker build -t $FULL_IMAGE .
-                        docker push $FULL_IMAGE
-                    '''
-                }
-            }
-            post {
-                success { 
-                    echo "✅ Image built and pushed: ${FULL_IMAGE}"
-                    script { updateJobStatus('build_complete') }
-                }
-                failure { echo "❌ Docker build/push failed" }
-            }
-        }
+        //             sh '''
+        //                 cd k8s-lstm
+        //                 echo "$DOCKER_PSW" | docker login -u "$DOCKER_USR" --password-stdin
+        //                 docker build -t $FULL_IMAGE .
+        //                 docker push $FULL_IMAGE
+        //             '''
+        //         }
+        //     }
+        //     post {
+        //         success { 
+        //             echo "✅ Image built and pushed: ${FULL_IMAGE}"
+        //             script { updateJobStatus('build_complete') }
+        //         }
+        //         failure { echo "❌ Docker build/push failed" }
+        //     }
+        // }
 
-        stage('Process YAML') {
-            steps {
-                script {
-                                
-                sh """
-                    # Use sed to replace placeholders in place
-                    sed -i 's|JENKINS_TRIGGER_URL|${JENKINS_TRIGGER_URL}|g' "./k8s-manifests/collector/metric_collector_deployment.yml"
-                    
-                    # Now the file is modified in the workspace
-                    cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
-                """
-                }
-            }
-        }
         stage('Deploy Production') {
             when {
                 expression { return !params.DEPLOY_STANDBY_ONLY }
