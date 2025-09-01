@@ -71,6 +71,11 @@
           type: Available
           status: "True"
         wait_timeout: 300
+      
+    - name: Wait for Velero deployment to be ready
+      shell: sleep 300
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
 
     - name: Verify Velero installation
       shell: velero get backup-locations
