@@ -119,104 +119,104 @@ pipeline {
         //     }
         // }
 
-//         stage('Deploy Production') {
-//             when {
-//                 expression { return !params.DEPLOY_STANDBY_ONLY }
-//             }
-//             agent {
-//                 kubernetes {
-//                     cloud 'k8s-automated-dr'
-//                     yaml """
-// apiVersion: v1
-// kind: Pod
-// metadata:
-//   labels:
-//     jenkins: agent
-// spec:
-//   serviceAccountName: jenkins-agent
-//   containers:
-//   - name: jnlp
-//     image: jenkins/inbound-agent:latest
-//     resources:
-//       requests:
-//         memory: "256Mi"
-//         cpu: "100m"
-//       limits:
-//         memory: "512Mi"
-//         cpu: "500m"
-//   - name: kubectl
-//     image: bitnami/kubectl:latest
-//     command: ["sleep"]
-//     args: ["99d"]
-//     tty: true
-//     securityContext:
-//       runAsUser: 1000
-//       runAsGroup: 1000
-//     resources:
-//       requests:
-//         memory: "128Mi"
-//         cpu: "50m"
-//       limits:
-//         memory: "256Mi"
-//         cpu: "200m"
-//   restartPolicy: Never
-// """
-//                     defaultContainer 'kubectl'
-//                 }
-//             }
-//             options { skipDefaultCheckout() }
-//             steps {
-//                 unstash 'repo-source'
+        stage('Deploy Production') {
+            when {
+                expression { return !params.DEPLOY_STANDBY_ONLY }
+            }
+            agent {
+                kubernetes {
+                    cloud 'k8s-automated-dr'
+                    yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: agent
+spec:
+  serviceAccountName: jenkins-agent
+  containers:
+  - name: jnlp
+    image: jenkins/inbound-agent:latest
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ["sleep"]
+    args: ["99d"]
+    tty: true
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+  restartPolicy: Never
+"""
+                    defaultContainer 'kubectl'
+                }
+            }
+            options { skipDefaultCheckout() }
+            steps {
+                unstash 'repo-source'
                 
-//                 container('kubectl') {
-//                     sh """
-//                         echo "Original File:"
-//                         cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
+                container('kubectl') {
+                    sh """
+                        echo "Original File:"
+                        cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
                         
-//                         # Use double quotes for the sed substitution to allow the shell to correctly expand the variable
-//                         sed -i "s|JENKINS_TRIGGER_URL|${env.JENKINS_TRIGGER_URL}|g" "./k8s-manifests/collector/metric_collector_deployment.yml"
+                        # Use double quotes for the sed substitution to allow the shell to correctly expand the variable
+                        sed -i "s|JENKINS_TRIGGER_URL|${env.JENKINS_TRIGGER_URL}|g" "./k8s-manifests/collector/metric_collector_deployment.yml"
                         
-//                         echo "Modified File:"
-//                         cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
+                        echo "Modified File:"
+                        cat "./k8s-manifests/collector/metric_collector_deployment.yml" 
 
-//                         echo "🔧 Applying Kubernetes manifests to PRODUCTION..."
-//                         kubectl version 
+                        echo "🔧 Applying Kubernetes manifests to PRODUCTION..."
+                        kubectl version 
                         
-//                         if ! kubectl get nodes; then
-//                             echo "❌ Cannot connect to Kubernetes cluster"
-//                             exit 1
-//                         fi
+                        if ! kubectl get nodes; then
+                            echo "❌ Cannot connect to Kubernetes cluster"
+                            exit 1
+                        fi
                         
-//                         // if kubectl api-resources | grep -q "stresschaos"; then
-//                         //     echo "▶️ Applying Chaos Mesh experiments"
-//                         //     kubectl apply -R -f k8s-manifests/ --validate=false
-//                         // else
-//                         //     echo "⚠️ Skipping Chaos Mesh objects (CRDs not installed)"
-//                         //     find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
-//                         //         if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "\$file"; then
-//                         //             kubectl apply -f "\$file"
-//                         //         fi
-//                         //     done
-//                         // fi
-//                     """
-//                 }
-//             }
-//             post {
-//                 success {
-//                     echo '✅ Production deployment completed successfully'
-//                     script { updateJobStatus('production_deployed') }
-//                 }
-//                 failure {
-//                     echo '❌ Production deployment failed'
-//                 }
-//             }
-//         }
+                        if kubectl api-resources | grep -q "stresschaos"; then
+                            echo "▶️ Applying Chaos Mesh experiments"
+                            kubectl apply -R -f k8s-manifests/ --validate=false
+                        else
+                            echo "⚠️ Skipping Chaos Mesh objects (CRDs not installed)"
+                            find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
+                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "\$file"; then
+                                    kubectl apply -f "\$file"
+                                fi
+                            done
+                        fi
+                    """
+                }
+            }
+            post {
+                success {
+                    echo '✅ Production deployment completed successfully'
+                    script { updateJobStatus('production_deployed') }
+                }
+                failure {
+                    echo '❌ Production deployment failed'
+                }
+            }
+        }
         
         stage('Deploy Standby') {
             when {
                 anyOf {
                     expression { return params.DEPLOY_STANDBY_ONLY }
-                    expression { return !params.DEPLOY_STANDBY_ONLY } // Always deploy standby for DR
+                    expression { return params.DEPLOY_STANDBY_ONLY } // Always deploy standby for DR
                 }
             }
             agent {
