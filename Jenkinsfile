@@ -187,17 +187,17 @@ spec:
                             exit 1
                         fi
                         
-                        if kubectl api-resources | grep -q "stresschaos"; then
-                            echo "▶️ Applying Chaos Mesh experiments"
-                            kubectl apply -R -f k8s-manifests/ --validate=false
-                        else
-                            echo "⚠️ Skipping Chaos Mesh objects (CRDs not installed)"
-                            find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
-                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "\$file"; then
-                                    kubectl apply -f "\$file"
-                                fi
-                            done
-                        fi
+                        // if kubectl api-resources | grep -q "stresschaos"; then
+                        //     echo "▶️ Applying Chaos Mesh experiments"
+                        //     kubectl apply -R -f k8s-manifests/ --validate=false
+                        // else
+                        //     echo "⚠️ Skipping Chaos Mesh objects (CRDs not installed)"
+                        //     find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
+                        //         if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "\$file"; then
+                        //             kubectl apply -f "\$file"
+                        //         fi
+                        //     done
+                        // fi
                     """
                 }
             }
