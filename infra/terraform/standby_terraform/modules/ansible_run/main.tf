@@ -27,16 +27,26 @@ resource "null_resource" "worker-nodes" {
 }
 
 resource "null_resource" "ansible" {
+  depends_on = [
+    null_resource.master-node,
+    null_resource.worker-nodes
+  ]
+
+  triggers = {
+    always_run = timestamp()
+  }
+
   provisioner "local-exec" {
     command = <<-EOT
               ANSIBLE_CONFIG=${var.local_exec.ansible_config.filename} \
               ansible-playbook \
                 -i ${var.local_exec.host_inventory.filename} \
                 ${var.local_exec.ansible_playbook.kubeadm} \
-                ${var.local_exec.ansible_playbook.velero} \
+                 ${var.local_exec.ansible_playbook.velero} \
                 --private-key ${var.remote_exec.private_key_path} \
                 -u ${var.remote_exec.ssh_user} \
                 -vvv
     EOT
   }
 }
+   

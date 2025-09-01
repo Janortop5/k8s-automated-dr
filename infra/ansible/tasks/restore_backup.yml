@@ -2,168 +2,104 @@
 # Velero Installation Tasks - Manual CLI Method
 # Include this file in your playbook with: include_tasks: velero-tasks.yml
 
-- name: Create temporary directory for Velero installation
-  tempfile:
-    state: directory
-    suffix: velero
-  register: velero_temp_dir
+- name: Backup play
+  hosts: master-node:!worker-node
+  vars_files:
+    - ../../ansible/host_vars/velero.yml
 
-- name: Download Velero CLI
-  get_url:
-    url: "https://github.com/vmware-tanzu/velero/releases/download/v{{ velero_version }}/velero-v{{ velero_version }}-linux-amd64.tar.gz"
-    dest: "{{ velero_temp_dir.path }}/velero.tar.gz"
-    mode: '0644'
+  tasks:
+    - name: Create temporary directory for Velero installation
+      tempfile:
+        state: directory
+        suffix: velero
+      register: velero_temp_dir
 
-- name: Extract Velero CLI
-  unarchive:
-    src: "{{ velero_temp_dir.path }}/velero.tar.gz"
-    dest: "{{ velero_temp_dir.path }}"
-    remote_src: yes
+    - name: Download Velero CLI
+      get_url:
+        url: "https://github.com/vmware-tanzu/velero/releases/download/v{{ velero_version }}/velero-v{{ velero_version }}-linux-amd64.tar.gz"
+        dest: "{{ velero_temp_dir.path }}/velero.tar.gz"
+        mode: '0644'
 
-- name: Find extracted Velero directory
-  find:
-    paths: "{{ velero_temp_dir.path }}"
-    patterns: "velero-*"
-    file_type: directory
-  register: velero_extract_dir
+    - name: Extract Velero CLI
+      unarchive:
+        src: "{{ velero_temp_dir.path }}/velero.tar.gz"
+        dest: "{{ velero_temp_dir.path }}"
+        remote_src: yes
 
-- name: Install Velero CLI to /usr/local/bin
-  copy:
-    src: "{{ velero_extract_dir.files[0].path }}/velero"
-    dest: /usr/local/bin/velero
-    mode: '0755'
-    remote_src: yes
+    - name: Find extracted Velero directory
+      find:
+        paths: "{{ velero_temp_dir.path }}"
+        patterns: "velero-*"
+        file_type: directory
+      register: velero_extract_dir
 
-- name: Create Velero secret file
-  copy:
-    content: |
-      [default]
-      aws_access_key_id = {{ velero_aws_access_key }}
-      aws_secret_access_key = {{ velero_aws_secret_key }}
-    dest: "{{ velero_temp_dir.path }}/velero-secret"
-    mode: '0600'
+    - name: Install Velero CLI to /usr/local/bin
+      copy:
+        src: "{{ velero_extract_dir.files[0].path }}/velero"
+        dest: /usr/local/bin/velero
+        mode: '0755'
+        remote_src: yes
 
-- name: Install Velero server components
-  shell: |
-    velero install \
-      --provider aws \
-      --plugins velero/velero-plugin-for-aws:v1.8.0 \
-      --bucket {{ velero_bucket_name }} \
-      --backup-location-config region={{ velero_aws_region }} \
-      --snapshot-location-config region={{ velero_aws_region }} \
-      --secret-file {{ velero_temp_dir.path }}/velero-secret
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
+    - name: Create Velero secret file
+      copy:
+        content: |
+          [default]
+          aws_access_key_id = {{ velero_aws_access_key }}
+          aws_secret_access_key = {{ velero_aws_secret_key }}
+        dest: "{{ velero_temp_dir.path }}/velero-secret"
+        mode: '0600'
 
-- name: Wait for Velero deployment to be ready
-  kubernetes.core.k8s:
-    api_version: apps/v1
-    kind: Deployment
-    name: velero
-    namespace: velero
-    wait_condition:
-      type: Available
-      status: "True"
-    wait_timeout: 300
+    - name: Install Velero server components
+      shell: |
+        velero install \
+          --provider aws \
+          --plugins velero/velero-plugin-for-aws:v1.8.0 \
+          --bucket {{ velero_bucket_name }} \
+          --backup-location-config region={{ velero_aws_region }} \
+          --snapshot-location-config region={{ velero_aws_region }} \
+          --secret-file {{ velero_temp_dir.path }}/velero-secret
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
 
-- name: Verify Velero installation
-  shell: velero get backup-locations
-  register: velero_backup_locations
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
- 
-- name: Display Velero backup locations
-  debug:
-    msg: "{{ velero_backup_locations.stdout }}"
+    - name: Wait for Velero deployment to be ready
+      kubernetes.core.k8s:
+        api_version: apps/v1
+        kind: Deployment
+        name: velero
+        namespace: velero
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_timeout: 300
 
-- name: Clean up temporary directory
-  file:
-    path: "{{ velero_temp_dir.path }}"
-    state: absent
+    - name: Verify Velero installation
+      shell: velero get backup-locations
+      register: velero_backup_locations
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
+    
+    - name: Display Velero backup locations
+      debug:
+        msg: "{{ velero_backup_locations.stdout }}"
 
-- name: Check for existing Velero backups
-  shell: velero get backups --output json
-  register: velero_backups
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
-  ignore_errors: true
+    - name: Clean up temporary directory
+      file:
+        path: "{{ velero_temp_dir.path }}"
+        state: absent
+      
+    - name: Check for existing Velero backups
+      shell: velero get backup -o json | jq '.items | sort_by(.metadata.creationTimestamp) | .[] | select(.status.phase == "Completed") | .metadata.name' | tail -n 1
+      register: latest_backup
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
+    #   ignore_errors: true
 
-- name: Debug velero_backups registration
-  debug:
-    msg: 
-      - "RC: {{ velero_backups.rc | default('undefined') }}"
-      - "stdout type: {{ velero_backups.stdout | type_debug }}"
-      - "stdout content: {{ velero_backups.stdout | default('no stdout') }}"
-  when: 
-      - velero_backups is defined
+    - name: Restore cluster from latest backup
+      shell: velero restore create --from-backup {{ latest_backup.stdout }}
+      when:
+        - latest_backup is defined
+        - latest_backup | length > 0
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
 
-- name: Parse and validate JSON structure
-  set_fact:
-    velero_json_parsed: "{{ velero_backups.stdout | from_json }}"
-  when: 
-    - velero_backups.rc == 0
-    - velero_backups.stdout is defined
-    - velero_backups.stdout | length > 0
-  ignore_errors: true
-
-- name: Debug parsed JSON structure
-  debug:
-    msg:
-      - "JSON type: {{ velero_json_parsed | type_debug }}"
-      - "Has items key: {{ 'items' in velero_json_parsed }}"
-      - "Items type: {{ velero_json_parsed.items | type_debug if 'items' in velero_json_parsed else 'no items key' }}"
-      - "Items length: {{ velero_json_parsed.items | length if ('items' in velero_json_parsed and velero_json_parsed.items is iterable) else 'not iterable or no items' }}"
-  when: 
-      - velero_json_parsed is defined
-
-- name: Set fact for latest Velero backup (safe approach)
-  block:
-    - name: Initialize backup variables
-      set_fact:
-        latest_backup: "No backups found."
-        
-    - name: Process backups if JSON is valid
-      set_fact:
-        latest_backup: "{{ found_backup }}"
-      vars:
-        found_backup: >-
-          {%- if velero_json_parsed is defined and velero_json_parsed is mapping -%}
-            {%- if 'items' in velero_json_parsed and velero_json_parsed.items is iterable and velero_json_parsed.items is not string -%}
-              {%- set all_items = velero_json_parsed.items | list -%}
-              {%- if all_items | length > 0 -%}
-                {%- set completed_items = [] -%}
-                {%- for item in all_items -%}
-                  {%- if item.status is defined and item.status.phase is defined and item.status.phase == 'Completed' -%}
-                    {%- set _ = completed_items.append(item) -%}
-                  {%- endif -%}
-                {%- endfor -%}
-                {%- if completed_items | length > 0 -%}
-                  {%- set sorted_items = completed_items | sort(attribute='status.completionTimestamp', reverse=True) -%}
-                  {{- sorted_items[0].metadata.name -}}
-                {%- else -%}
-                  No completed backups found.
-                {%- endif -%}
-              {%- else -%}
-                No backup items found.
-              {%- endif -%}
-            {%- else -%}
-              Invalid or missing items in backup data.
-            {%- endif -%}
-          {%- else -%}
-            Failed to parse backup JSON.
-          {%- endif -%}
-      when: 
-          - velero_json_parsed is defined
-  when: 
-      - velero_backups.rc == 0
-
-- name: Display final result
-  debug:
-    msg: "Latest backup: {{ latest_backup }}"
-
-- name: Restore cluster from latest backup
-  shell: velero restore create --from-backup {{ latest_backup }}
-  when: 
-      - latest_backup is defined
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
+   
