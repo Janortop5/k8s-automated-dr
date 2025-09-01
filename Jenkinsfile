@@ -288,6 +288,7 @@ pipeline {
                                         echo "[INFO] DESTROY_AFTER_APPLY disabled - resources remain deployed"
                                     fi
                                 else
+                                    sleep 1000
                                     echo "[ERROR] Terraform apply failed"
                                     echo "[INFO] Attempting cleanup of partial resources..."
                                     terraform destroy -auto-approve || echo "[WARN] Destroy failed"
