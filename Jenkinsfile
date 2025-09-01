@@ -222,6 +222,7 @@ spec:
             agent {
                 docker {
                     image 'freshinit/jenkins-agent-with-tools:latest'
+                    args '-u root:root'
                 }
             }
             options { skipDefaultCheckout() }
