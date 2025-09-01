@@ -222,7 +222,7 @@ pipeline {
             agent {
                 docker {
                     image 'freshinit/jenkins-agent-with-tools:latest'
-                    // args '-u root:root'
+                    args '-u root:root'
                 }
             }
             options { skipDefaultCheckout() }
