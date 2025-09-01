@@ -222,7 +222,7 @@ pipeline {
             agent {
                 docker {
                     image 'freshinit/jenkins-agent-with-tools:latest'
-                    args '-u root:root'
+                    // args '-u root:root'
                 }
             }
             options { skipDefaultCheckout() }
@@ -247,6 +247,8 @@ pipeline {
                                 export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
                                 export VELERO_BUCKET_NAME=${BACKUP_BUCKET}
                                 export VELERO_REGION=${BACKUP_BUCKET_REGION}
+
+
                                 export TF_VAR_aws_access_key_id=${AWS_ACCESS_KEY}
                                 export TF_VAR_aws_secret_access_key=${AWS_SECRET_KEY}
                                 export TF_VAR_velero_bucket_name=${BACKUP_BUCKET}
