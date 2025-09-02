@@ -1,5 +1,5 @@
 ---
-- hosts: master-node:worker-node:!jenkins-server
+- hosts: master-node:!worker-node:jenkins-server
   become: true
   gather_facts: true
   vars_files:
@@ -10,8 +10,9 @@
   - name: Install and Setup Velero
     import_tasks: tasks/install_velero.yml
     tags: velero
+    when: "'master-node' in group_names"
 
   - name: Display all configured variables and set facts for user or operator
     import_tasks: tasks/display_variables.yml
     tags: variables_and_facts
-    when: inventory_hostname == "jenkins-server" 
+    when: "'jenkins-server' in group_names"
