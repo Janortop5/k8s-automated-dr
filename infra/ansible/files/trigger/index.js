@@ -203,7 +203,7 @@ class StreamlinedNodeJSTrigger {
     async triggerJenkinsWebhook(job) {
         try {
             // Get webhook configuration from Vault
-            const { webhookUrl, webhookToken } = await this.getWebhookFromVault();
+            const { webhookUrl, webhookToken, username } = await this.getWebhookFromVault();
             
             // Prepare webhook payload for Generic Webhook Trigger plugin
             const payload = {
@@ -216,6 +216,10 @@ class StreamlinedNodeJSTrigger {
             
             // Make HTTP POST to Jenkins webhook
             const response = await axios.post(webhookUrl, payload, {
+                auth: {
+                    username: username,
+                    password: webhookToken
+                },
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -259,12 +263,16 @@ class StreamlinedNodeJSTrigger {
 
     async getWebhookFromVault() {
         try {
-            const response = await this.vaultClient.get(`/v1/secret/data/jenkins/`);
-            const data = response.data.data.data;
+            const token_response = await this.vaultClient.get(`/v1/secret/data/jenkins_webhook_token`);
+            const token_data = token_response.data.data.data;
+
+            const user_response = await this.vaultClient.get(`/v1/secret/data/jenkins`);
+            const user_data = user_response.data.data.data;
             
             return {
-                webhookUrl: data.webhook_url,
-                webhookToken: data.webhook_token
+                webhookUrl: token_data.webhook_url,
+                webhookToken: token_data.token,
+                username: user_data.jenkins_username
             };
         } catch (error) {
             console.error('❌ Failed to retrieve webhook config from Vault:', error.message);
