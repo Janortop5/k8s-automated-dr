@@ -186,17 +186,17 @@ spec:
                             echo "❌ Cannot connect to Kubernetes cluster"
                             exit 1
                         fi
-                        kubectl apply -f k8s-manifests/collector/metric_collector_deployment.yml
-                        # if kubectl api-resources | grep -q "stresschaos"; then
-                        #     echo "▶️ Applying Chaos Mesh experiments"
-                        #     kubectl apply -R -f k8s-manifests/ --validate=false
-                        # else
-                        #     echo "⚠️ Skipping Chaos Mesh objects (CRDs not installed)"
-                        #     find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
-                        #         if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "\$file"; then
-                        #             kubectl apply -f "\$file"
-                        #         fi
-                        #     done
+
+                        if kubectl api-resources | grep -q "stresschaos"; then
+                            echo "▶️ Applying Chaos Mesh experiments"
+                            kubectl apply -R -f k8s-manifests/ --validate=false
+                        else
+                            echo "⚠️ Skipping Chaos Mesh objects (CRDs not installed)"
+                            find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
+                                if ! grep -q "kind: StressChaos\\|kind: PodChaos\\|kind: NetworkChaos" "\$file"; then
+                                    kubectl apply -f "\$file"
+                                fi
+                            done
                         # fi
                     """
                 }
@@ -216,7 +216,7 @@ spec:
             when {
                 anyOf {
                     expression { return params.DEPLOY_STANDBY_ONLY }
-                    expression { return params.DEPLOY_STANDBY_ONLY } // Always deploy standby for DR
+                    expression { return params.DEPLOY_STANDBY_ONLY } 
                 }
             }
             agent {
