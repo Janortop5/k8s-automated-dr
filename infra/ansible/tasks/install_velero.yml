@@ -71,24 +71,29 @@
   register: velero_backup_locations
   environment:
     KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
-
-- name: Display Velero backup locations
-  debug:
-    msg: "{{ velero_backup_locations.stdout }}"
-
-- name: Clean up temporary directory
-  file:
-    path: "{{ velero_temp_dir.path }}"
-    state: absent
-
+ 
 - name: Check if backup schedule exists
   shell: velero get schedules | grep "every-6-hours" || echo "not found"
   register: schedule_exists
-  ignore_errors: true
+  # ignore_errors: true
 
 - name: Create Velero backup schedule
   shell: velero schedule create every-6-hours --schedule "0 */6 * * *" --ttl 72h
   args:
     executable: /bin/bash
   when: schedule_exists.stdout == "not found"
+  # ignore_errors: true
+
+- name: Create an immediate Velero backup for testing
+  shell: velero backup create test-backup-vv4 --wait
+  register: immediate_backup
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path | default(ansible_env.HOME + '/.kube/config') }}"
+  when: schedule_exists.stdout == "not found"
   ignore_errors: true
+
+
+- name: Display immediate backup result
+  debug:
+    msg: "{{ immediate_backup.stdout }}"
+  when: schedule_exists.stdout == "not found"
