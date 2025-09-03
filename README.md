@@ -688,3 +688,42 @@ curl -X POST "<jenkins_live_domain>/trigger" \
 ```
 
 This service enables fully automated disaster recovery by providing a reliable mechanism to trigger the standby environment deployment when the primary cluster experiences issues.
+
+## Chaos Mesh and Disaster Recovery Simulation
+
+### Chaos Mesh
+The system includes Chaos Mesh for chaos engineering experiments, but note that:
+- The cluster already experience high CPU usage on t3 instance types without running chaos experiments
+- Consider using larger instance types if you plan to run extensive chaos tests
+
+### Standby Authentication
+For standby environment authentication:
+- The trigger URL needs to be exposed and added to Jenkins secrets
+- Use the credential ID `jenkins-url` when setting up the authentication
+
+### Simulating Disaster Recovery
+To simulate a full disaster recovery scenario:
+
+1. **Rebuild the metrics-collector container**:
+   ```bash
+   # Navigate to the metrics-collector directory
+   cd k8s-lstm/metrics-collector/alert_manager.py
+   
+   # Modify the parameters in alert_manager.py to set deploy_standby to true
+   # Look for the parameters section and change:
+   # "deploy_standby_only": "false" to "deploy_standby_only": "true"
+   
+   # Rebuild and push the container
+   docker build -t your-registry/metrics-collector:latest .
+   docker push your-registry/metrics-collector:latest
+   ```
+
+2. **Monitor the Jenkins pipeline**:
+   - When the metrics collector detects anomalies, it will trigger the Jenkins pipeline
+   - With `deploy_standby_only` set to `true`, it will deploy the standby environment
+   - You can monitor the progress in the Jenkins UI
+
+3. **Verify the standby environment**:
+   - After successful deployment, verify the standby environment is operational
+   - Check that all critical services are running
+   - Test the application functionality in the standby environment
