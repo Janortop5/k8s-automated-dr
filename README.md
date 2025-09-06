@@ -543,8 +543,7 @@ terraform state rm <resource-name> # i.e. terraform state rm module.remote_state
    - kubeconfig-<master_private_ip>.yaml
    - jenkins-kubeconfig.yaml
 
-## Jenkins: Manual Step/Setup
-Credentials and Kubernetes cloud fails. Here's a manual setup guide.
+## Jenkins: Setup Steps
 #### Easiest: *Multibranch Pipeline* (auto-discovers branches & PRs)
 
 1. Jenkins dashboard → **New Item**
@@ -573,6 +572,7 @@ rm -rf /var/lib/jenkins/workspace/* /var/lib/jenkins/tmp/*
 sudo su - jenkins
 mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
 ```
+Check below for step-by-step ⬇️
 
 ## Dashboards: View resource metrics
 1. **Access Prometheus UI**
@@ -729,8 +729,9 @@ To simulate a full disaster recovery scenario:
    - Check that all critical services are running
    - Test the application functionality in the standby environment
   
-   # Manual Jenkins setup
-### Setup Jenkins for k8s-automated-dr
+# Manual Jenkins setup
+Credentials and Kubernetes cloud automation currently fails. Here's a manual setup guide.
+### Setup Jenkins for KIDR
 AFTER RUNNING THE INFRA's TERRAFORM CODE AND ANSIBLE TASKS.
 
 Below is the quickest path to hook k8s-automated-dr Jenkins box up to its GitHub repo so every push kicks off a build.
@@ -932,5 +933,3 @@ rm -rf /var/lib/jenkins/workspace/* /var/lib/jenkins/tmp/*
 sudo su - jenkins
 mkdir -p /var/lib/jenkins/workspace/k8s-automated-dr-pipeline_main
 ```
-
-
