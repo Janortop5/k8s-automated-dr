@@ -544,6 +544,7 @@ terraform state rm <resource-name> # i.e. terraform state rm module.remote_state
    - jenkins-kubeconfig.yaml
 
 ## Jenkins: Manual Step/Setup
+Credentials and Kubernetes cloud fails. Here's a manual setup guide.
 #### Easiest: *Multibranch Pipeline* (auto-discovers branches & PRs)
 
 1. Jenkins dashboard → **New Item**
