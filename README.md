@@ -730,7 +730,7 @@ To simulate a full disaster recovery scenario:
    - Test the application functionality in the standby environment
   
 # Manual Jenkins setup
-Credentials and Kubernetes cloud automation currently fails. Here's a manual setup guide.
+Jenkins Credentials and Jenkins Kubernetes cloud automation currently fails. Here's a manual setup guide.
 ### Setup Jenkins for KIDR
 AFTER RUNNING THE INFRA's TERRAFORM CODE AND ANSIBLE TASKS.
 
