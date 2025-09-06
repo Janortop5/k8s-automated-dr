@@ -1,4 +1,4 @@
-# KIDR: inference driven kubernetes disaster recovery system MANUAL
+# KIDR MANUAL: Inference Driven Kubernetes Disaster Recovery System 
 ## 1. High-Level System Concept
 An **automated** end‑to‑end **platform** that:
 1. Provisions **AWS infrastructure** (network, compute, access, DNS) **via** Terraform (primary + standby environments).
