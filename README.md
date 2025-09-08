@@ -269,11 +269,13 @@ This notebook requires the following Python libraries:
     jupyter notebook
     ```
 
-3. Select the your `conda/env` name kernel.
+3. Select the notebook `lstm-disaster-recovery.ipynb`
 
-4. Run All cells top-to-bottom (ModelManager is defined first).
+4. Select the your `conda/env` name kernel.
 
-5. **Run all cells** to preprocess data, train the model, evaluate performance, and simulate disaster alerts.
+5. Run All cells top-to-bottom (ModelManager is defined first).
+
+6. **Run all cells** to preprocess data, train the model, evaluate performance, and simulate disaster alerts.
 
 #### 💾 Model Saving & Loading
 
