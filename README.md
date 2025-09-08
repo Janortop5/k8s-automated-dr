@@ -205,6 +205,7 @@ This notebook requires the following Python libraries:
 
 1. Create & activate:
    ```bash
+   cd k8s-lstm/notebook
    conda env create -f environment.yml
    conda activate k8s-lstm
    ```
@@ -219,7 +220,7 @@ This notebook requires the following Python libraries:
 3. If you update requirements.txt, sync with:
     ```bash
     Edit
-    pip install -r notebook/requirements.txt
+    pip install -r requirements.in
     ```
 
 #### To run locally → Option B: Pip only
