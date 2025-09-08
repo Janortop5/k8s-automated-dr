@@ -175,6 +175,20 @@ This Jupyter notebook implements a proof-of-concept for an automated disaster re
 3. **Model Training and Evaluation**: (Section in notebook) Training the LSTM on historical metrics, visualizing loss curves, and evaluating prediction accuracy.
 4. **Disaster Prediction and Alerting System**: Generating alerts based on model predictions exceeding predefined thresholds and simulating recovery actions.
 
+#### Dataset
+
+The notebook expects a CSV file containing Kubernetes performance metrics with at least the following columns:
+
+* `timestamp`: DateTime string for metric recording times.
+* `pod_name`: Identifier for each pod.
+* `cpu_usage`: CPU usage metric (e.g., cores).
+* `memory_usage`: Memory usage metric (e.g., MiB).
+
+data(set) paths:
+- data ingestion: `/data/kubernetes_performance_metrics_dataset.csv`
+- model save: `/data/cluster/`
+
+Adjust the `csv_path` variable in the DataProcessor instantiation if needed.
 #### Repository Structure
 `/k8s-lstm/notebook/`
 1. lstm-disaster-recovery.ipynb → Main notebook (~few MBs); contains code, visualizations & annotations
@@ -243,21 +257,6 @@ This notebook requires the following Python libraries:
     python -m ipykernel install --user \
         --name k8s-lstm --display-name "Python (fyp)"
     ```
-
-#### Dataset
-
-The notebook expects a CSV file containing Kubernetes performance metrics with at least the following columns:
-
-* `timestamp`: DateTime string for metric recording times.
-* `pod_name`: Identifier for each pod.
-* `cpu_usage`: CPU usage metric (e.g., cores).
-* `memory_usage`: Memory usage metric (e.g., MiB).
-
-data(set) paths:
-- data ingestion: `/data/kubernetes_performance_metrics_dataset.csv`
-- model save: `/data/cluster/`
-
-Adjust the `csv_path` variable in the DataProcessor instantiation if needed.
 
 #### Running the Notebook
 1. Change into the notebook folder so that os.getcwd() points at …/k8s-lstm/notebook:
