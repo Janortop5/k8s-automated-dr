@@ -226,7 +226,7 @@ This notebook requires the following Python libraries:
 #### To run locally → Option B: Pip only
 1. Create a venv and activate it:
     ```bash
-    python3.11 -m venv .venv
+    python3 -m venv .venv
     source .venv/bin/activate
     ```
 
@@ -234,7 +234,7 @@ This notebook requires the following Python libraries:
 
     ```bash
     pip install --upgrade pip
-    pip install -r notebook/requirements.txt
+    pip install -r notebook/requirements.in
     ```
 
 3. (Optional) Register as a kernel:
